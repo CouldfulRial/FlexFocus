@@ -1,5 +1,6 @@
 import Foundation
 import CloudKit
+import Security
 
 final class CrossDeviceNotificationService: @unchecked Sendable {
     static let shared = CrossDeviceNotificationService()
@@ -117,7 +118,19 @@ final class CrossDeviceNotificationService: @unchecked Sendable {
     }
 
     private var canUseCloudKit: Bool {
-        Bundle.main.bundleURL.pathExtension == "app"
+        Bundle.main.bundleURL.pathExtension == "app" && hasICloudEntitlement
+    }
+
+    private var hasICloudEntitlement: Bool {
+        let entitlementKey = "com.apple.developer.icloud-container-identifiers" as CFString
+        let task = SecTaskCreateFromSelf(nil)
+        guard let task else { return false }
+        let value = SecTaskCopyValueForEntitlement(task, entitlementKey, nil)
+
+        if let array = value as? [String] {
+            return !array.isEmpty
+        }
+        return false
     }
 
     private var deviceID: String {
