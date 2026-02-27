@@ -13,19 +13,9 @@ struct TaskKeywordAgent {
         guard !normalized.isEmpty else { return [] }
         let blockedWords = blockedWordsSet()
 
-        let tokenizer = NLTokenizer(unit: .word)
-        tokenizer.string = normalized
-
-        var candidates: [String] = []
-
-        tokenizer.enumerateTokens(in: normalized.startIndex..<normalized.endIndex) { range, _ in
-            let token = String(normalized[range])
-            let cleaned = cleanToken(token)
-            if isKeyword(cleaned, blockedWords: blockedWords) {
-                candidates.append(cleaned)
-            }
-            return true
-        }
+        let candidates = tokenize(normalized)
+            .map(cleanToken)
+            .filter { isKeyword($0, blockedWords: blockedWords) }
 
         var seen = Set<String>()
         var unique: [String] = []
@@ -47,19 +37,62 @@ struct TaskKeywordAgent {
             .lowercased()
     }
 
+    private func tokenize(_ text: String) -> [String] {
+        var tokens: [String] = []
+        var current = ""
+
+        let scalars = Array(text.unicodeScalars)
+
+        func flush() {
+            if !current.isEmpty {
+                tokens.append(current)
+                current = ""
+            }
+        }
+
+        for index in scalars.indices {
+            let scalar = scalars[index]
+
+            if CharacterSet.alphanumerics.contains(scalar) || isCJK(scalar) {
+                current.unicodeScalars.append(scalar)
+                continue
+            }
+
+            if scalar == "-" {
+                let hasLeft = !current.isEmpty
+                let hasRight = index + 1 < scalars.count && CharacterSet.alphanumerics.contains(scalars[index + 1])
+                if hasLeft && hasRight {
+                    current.unicodeScalars.append(scalar)
+                    continue
+                }
+            }
+
+            flush()
+        }
+
+        flush()
+        return tokens
+    }
+
+    private func isCJK(_ scalar: UnicodeScalar) -> Bool {
+        (0x4E00...0x9FFF).contains(Int(scalar.value))
+    }
+
     private func isKeyword(_ token: String, blockedWords: Set<String>) -> Bool {
         guard !token.isEmpty else { return false }
         guard !blockedWords.contains(token) else { return false }
 
         let hasCJK = token.unicodeScalars.contains { scalar in
-            (0x4E00...0x9FFF).contains(Int(scalar.value))
+            isCJK(scalar)
         }
 
         if hasCJK {
             return token.count >= 2
         }
 
-        let alnum = token.unicodeScalars.allSatisfy { CharacterSet.alphanumerics.contains($0) }
-        return alnum && token.count >= 3
+        let asciiWord = token.unicodeScalars.allSatisfy { scalar in
+            CharacterSet.alphanumerics.contains(scalar) || scalar == "-"
+        }
+        return asciiWord && token.count >= 3
     }
 }

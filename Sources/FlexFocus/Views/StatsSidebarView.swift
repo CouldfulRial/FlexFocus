@@ -58,8 +58,7 @@ struct StatsSidebarView: View {
                         .font(.headline)
 
                     ZStack {
-                        Rectangle()
-                            .fill(.white)
+                        Color.clear
                         if pieSlices.isEmpty {
                             Text("暂无占比数据")
                                 .foregroundStyle(.secondary)

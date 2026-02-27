@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:FlexFocus}",
+            "name": "Debug FlexFocus",
+            "target": "FlexFocus",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug FlexFocus"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:FlexFocus}",
+            "name": "Release FlexFocus",
+            "target": "FlexFocus",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release FlexFocus"
+        }
+    ]
+}

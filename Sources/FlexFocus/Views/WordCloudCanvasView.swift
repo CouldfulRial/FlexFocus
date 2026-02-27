@@ -32,8 +32,7 @@ struct WordCloudCanvasView: View {
 
     var body: some View {
         ZStack {
-            Rectangle()
-                .fill(.white)
+            Color.clear
 
             ForEach(layoutWords(in: CGSize(width: width, height: height))) { item in
                 Text(item.stat.word)
