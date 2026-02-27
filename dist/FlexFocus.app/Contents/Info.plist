@@ -10,6 +10,8 @@
     <string>com.flexfocus.app</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
+    <key>CFBundleIconFile</key>
+    <string>FlexFocus.icns</string>
     <key>CFBundleName</key>
     <string>FlexFocus</string>
     <key>CFBundlePackageType</key>

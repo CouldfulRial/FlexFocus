@@ -3,9 +3,22 @@
 <plist version="1.0">
 <dict>
 	<key>files</key>
-	<dict/>
+	<dict>
+		<key>Resources/FlexFocus.icns</key>
+		<data>
+		yM9k0+t4eOzJVRrA9bZU8CvVf+U=
+		</data>
+	</dict>
 	<key>files2</key>
-	<dict/>
+	<dict>
+		<key>Resources/FlexFocus.icns</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			jI99XH66RBET/CEcuEtApenTmTqNWNByh8iSqrfvBNQ=
+			</data>
+		</dict>
+	</dict>
 	<key>rules</key>
 	<dict>
 		<key>^Resources/</key>
