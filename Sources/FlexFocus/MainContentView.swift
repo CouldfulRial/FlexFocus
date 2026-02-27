@@ -7,6 +7,7 @@ struct MainContentView: View {
     @State private var viewModel = FocusViewModel()
     @State private var taskInput = ""
     @State private var selectedRange: StatisticsRange = .week
+    @State private var didConfigureWindow = false
     private let sessionStore = SessionStore()
 
     var body: some View {
@@ -49,6 +50,10 @@ struct MainContentView: View {
             )
             .frame(width: 420)
             .padding()
+            .onAppear {
+                NSApplication.shared.activate(ignoringOtherApps: true)
+                NSApplication.shared.windows.first?.makeKeyAndOrderFront(nil)
+            }
         }
         .alert("是否开始休息？", isPresented: breakConfirmationBinding) {
             Button("稍后") {
@@ -64,6 +69,7 @@ struct MainContentView: View {
         }
         .onAppear {
             sessions = sessionStore.load().sorted(by: { $0.startTime > $1.startTime })
+            configureWindowIfNeeded()
         }
     }
 
@@ -113,5 +119,17 @@ struct MainContentView: View {
         let minute = seconds / 60
         let second = seconds % 60
         return String(format: "%02d:%02d", minute, second)
+    }
+
+    private func configureWindowIfNeeded() {
+        guard !didConfigureWindow else { return }
+        didConfigureWindow = true
+
+        DispatchQueue.main.async {
+            NSApplication.shared.activate(ignoringOtherApps: true)
+            guard let window = NSApplication.shared.windows.first else { return }
+            window.center()
+            window.makeKeyAndOrderFront(nil)
+        }
     }
 }
