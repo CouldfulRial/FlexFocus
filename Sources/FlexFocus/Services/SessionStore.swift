@@ -24,4 +24,8 @@ final class SessionStore {
         guard let data = try? encoder.encode(sessions) else { return }
         try? data.write(to: fileURL, options: .atomic)
     }
+
+    func clear() {
+        try? FileManager.default.removeItem(at: fileURL)
+    }
 }

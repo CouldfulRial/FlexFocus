@@ -1,6 +1,7 @@
 import SwiftUI
 import Charts
 import AppKit
+import Combine
 
 struct MainContentView: View {
     @State private var sessions: [FocusSession] = []
@@ -70,6 +71,10 @@ struct MainContentView: View {
         .onAppear {
             sessions = sessionStore.load().sorted(by: { $0.startTime > $1.startTime })
             configureWindowIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .clearAllHistoryRequested)) { _ in
+            sessions = []
+            sessionStore.clear()
         }
     }
 

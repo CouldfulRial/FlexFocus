@@ -1,6 +1,13 @@
 import SwiftUI
 import Charts
 
+private struct PieSlice: Identifiable {
+    let id: String
+    let word: String
+    let totalSeconds: Double
+    let ratio: Double
+}
+
 struct StatsSidebarView: View {
     let sessions: [FocusSession]
     @Binding var selectedRange: StatisticsRange
@@ -18,7 +25,7 @@ struct StatsSidebarView: View {
                 .pickerStyle(.segmented)
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("每日专注时长", systemImage: "chart.bar")
+                    Label("专注时长", systemImage: "chart.bar")
                         .font(.headline)
                     Chart(timeBuckets) { bucket in
                         BarMark(
@@ -47,22 +54,29 @@ struct StatsSidebarView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("词汇专注占比", systemImage: "chart.pie")
+                    Label("专注占比", systemImage: "chart.pie")
                         .font(.headline)
 
                     ZStack {
                         Rectangle()
                             .fill(.white)
-                        if topPieStats.isEmpty {
+                        if pieSlices.isEmpty {
                             Text("暂无占比数据")
                                 .foregroundStyle(.secondary)
                         } else {
-                            Chart(topPieStats) { stat in
+                            Chart(pieSlices) { slice in
                                 SectorMark(
-                                    angle: .value("时长", stat.totalSeconds),
+                                    angle: .value("时长", slice.totalSeconds),
                                     innerRadius: .ratio(0.5)
                                 )
-                                .foregroundStyle(by: .value("词", stat.word))
+                                .foregroundStyle(by: .value("词", slice.word))
+                                .annotation(position: .overlay) {
+                                    if slice.ratio > 0.10 {
+                                        Text("\(Int(slice.ratio * 100))%")
+                                            .font(.caption2.bold())
+                                            .foregroundStyle(.white)
+                                    }
+                                }
                             }
                         }
                     }
@@ -81,8 +95,19 @@ struct StatsSidebarView: View {
         StatsCalculator.wordStats(from: sessions)
     }
 
-    private var topPieStats: [WordStat] {
-        Array(wordStats.prefix(8))
+    private var pieSlices: [PieSlice] {
+        let top = Array(wordStats.prefix(8))
+        let total = top.reduce(0.0) { $0 + $1.totalSeconds }
+        guard total > 0 else { return [] }
+
+        return top.map { stat in
+            PieSlice(
+                id: stat.id,
+                word: stat.word,
+                totalSeconds: stat.totalSeconds,
+                ratio: stat.totalSeconds / total
+            )
+        }
     }
 
     private func durationUnitText(_ seconds: Int) -> String {
