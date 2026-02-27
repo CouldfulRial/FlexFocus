@@ -14,6 +14,7 @@ ICON_SOURCE="$ROOT_DIR/FlexFocus.png"
 ICON_NAME="FlexFocus"
 ICONSET_DIR="$DIST_DIR/${ICON_NAME}.iconset"
 ICNS_PATH="$RESOURCES_DIR/${ICON_NAME}.icns"
+ICON_PLIST_BLOCK=""
 
 mkdir -p "$DIST_DIR"
 
@@ -41,11 +42,19 @@ if [[ -f "$ICON_SOURCE" ]]; then
     sips -z 512 512 "$ICON_SOURCE" --out "$ICONSET_DIR/icon_512x512.png" >/dev/null
     sips -z 1024 1024 "$ICON_SOURCE" --out "$ICONSET_DIR/icon_512x512@2x.png" >/dev/null
 
-    iconutil -c icns "$ICONSET_DIR" -o "$ICNS_PATH"
+    if iconutil -c icns "$ICONSET_DIR" -o "$ICNS_PATH"; then
+        ICON_PLIST_BLOCK=$(cat <<'EOF'
+    <key>CFBundleIconFile</key>
+    <string>FlexFocus.icns</string>
+EOF
+)
+    else
+        echo "Warning: failed to generate icns from $ICON_SOURCE, packaging without custom icon."
+    fi
     rm -rf "$ICONSET_DIR"
 fi
 
-cat > "$PLIST_PATH" <<'PLIST'
+cat > "$PLIST_PATH" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -58,8 +67,7 @@ cat > "$PLIST_PATH" <<'PLIST'
     <string>com.flexfocus.app</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
-    <key>CFBundleIconFile</key>
-    <string>FlexFocus.icns</string>
+${ICON_PLIST_BLOCK}
     <key>CFBundleName</key>
     <string>FlexFocus</string>
     <key>CFBundlePackageType</key>

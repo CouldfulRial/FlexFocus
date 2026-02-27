@@ -10,10 +10,18 @@ struct NotificationService {
     }
 
     func sendBreakFinishedNotification() {
+        sendLocalNotification(title: "休息结束", body: "可以开始下一轮专注了。")
+    }
+
+    func sendCrossDeviceBreakFinishedNotification() {
+        sendLocalNotification(title: "其他设备休息结束", body: "你在另一台设备上的休息已结束。")
+    }
+
+    private func sendLocalNotification(title: String, body: String) {
         guard canUseUserNotifications else { return }
         let content = UNMutableNotificationContent()
-        content.title = "休息结束"
-        content.body = "可以开始下一轮专注了。"
+        content.title = title
+        content.body = body
         content.sound = .default
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.2, repeats: false)

@@ -10,6 +10,8 @@ struct FlexFocusApp: App {
         if AppSettings.shared.enableBreakNotification {
             NotificationService.shared.requestAuthorizationIfNeeded()
         }
+
+        CrossDeviceNotificationService.shared.start()
     }
 
     var body: some Scene {

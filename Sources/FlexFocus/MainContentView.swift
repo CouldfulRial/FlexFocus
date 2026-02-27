@@ -33,7 +33,11 @@ struct MainContentView: View {
             )
             .frame(minWidth: 380)
 
-            FocusHistoryView(sessions: sessions)
+            FocusHistoryView(
+                sessions: sessions,
+                onUpdateTask: updateSessionTask,
+                onDeleteSession: deleteSession
+            )
                 .frame(minWidth: 360)
         }
         .sheet(isPresented: $viewModel.isTaskSheetPresented) {
@@ -104,6 +108,18 @@ struct MainContentView: View {
             sessions.sort(by: { $0.startTime > $1.startTime })
             sessionStore.save(sessions)
         }
+    }
+
+    private func updateSessionTask(sessionID: UUID, newTask: String) {
+        guard let index = sessions.firstIndex(where: { $0.id == sessionID }) else { return }
+        sessions[index].task = newTask
+        sessions.sort(by: { $0.startTime > $1.startTime })
+        sessionStore.save(sessions)
+    }
+
+    private func deleteSession(sessionID: UUID) {
+        sessions.removeAll(where: { $0.id == sessionID })
+        sessionStore.save(sessions)
     }
 
     private var breakConfirmationBinding: Binding<Bool> {

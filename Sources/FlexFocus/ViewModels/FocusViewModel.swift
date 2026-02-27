@@ -73,6 +73,7 @@ final class FocusViewModel {
             if self.remainingBreakSeconds == 0 {
                 if shouldNotifyWhenDone {
                     NotificationService.shared.sendBreakFinishedNotification()
+                    CrossDeviceNotificationService.shared.publishBreakFinishedEvent()
                 }
                 self.stopTimer()
                 self.resetToIdle()

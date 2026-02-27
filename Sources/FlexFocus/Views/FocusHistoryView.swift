@@ -2,6 +2,11 @@ import SwiftUI
 
 struct FocusHistoryView: View {
     let sessions: [FocusSession]
+    let onUpdateTask: (UUID, String) -> Void
+    let onDeleteSession: (UUID) -> Void
+
+    @State private var editingSession: FocusSession?
+    @State private var editedTask: String = ""
 
     private let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -30,6 +35,15 @@ struct FocusHistoryView: View {
                                 .foregroundStyle(.secondary)
                         }
                         .padding(.vertical, 4)
+                        .contextMenu {
+                            Button("编辑任务") {
+                                editingSession = session
+                                editedTask = session.task
+                            }
+                            Button("删除记录", role: .destructive) {
+                                onDeleteSession(session.id)
+                            }
+                        }
                     }
                 }
             }
@@ -38,6 +52,32 @@ struct FocusHistoryView: View {
             if sessions.isEmpty {
                 ContentUnavailableView("暂无专注历史", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
             }
+        }
+        .sheet(item: $editingSession) { session in
+            VStack(alignment: .leading, spacing: 12) {
+                Text("编辑任务")
+                    .font(.headline)
+
+                TextField("任务名称", text: $editedTask)
+                    .textFieldStyle(.roundedBorder)
+
+                HStack {
+                    Spacer()
+                    Button("取消") {
+                        editingSession = nil
+                    }
+                    Button("保存") {
+                        let trimmed = editedTask.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty else { return }
+                        onUpdateTask(session.id, trimmed)
+                        editingSession = nil
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(editedTask.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding()
+            .frame(width: 360)
         }
     }
 
