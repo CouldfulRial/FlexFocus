@@ -108,7 +108,7 @@ struct MainContentView: View {
                 return false
             },
             set: { newValue in
-                if !newValue {
+                if !newValue, case .awaitingBreakConfirmation = viewModel.phase {
                     viewModel.skipBreak()
                 }
             }

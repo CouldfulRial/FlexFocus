@@ -34,7 +34,7 @@ enum StatsCalculator {
         var durationMap: [String: Double] = [:]
 
         for session in sessions {
-            let words = tokenize(session.task)
+            let words = TaskKeywordAgent.shared.extractKeywords(from: session.task)
             guard !words.isEmpty else { continue }
 
             let share = Double(session.durationSeconds) / Double(words.count)
@@ -56,26 +56,21 @@ enum StatsCalculator {
             }
     }
 
-    private static func tokenize(_ task: String) -> [String] {
-        task
-            .lowercased()
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .filter { $0.count >= 2 }
-    }
-
     private static func dayBuckets(sessions: [FocusSession], now: Date, calendar: Calendar) -> [TimeBucket] {
         let start = calendar.startOfDay(for: now)
-        let labels = (0..<24).map { hour -> String in
+        let labels = stride(from: 0, to: 24, by: 2).map { hour -> String in
             let value = calendar.date(byAdding: .hour, value: hour, to: start) ?? start
             let hourValue = calendar.component(.hour, from: value)
-            return String(format: "%02d", hourValue)
+            let next = (hourValue + 2) % 24
+            return String(format: "%02d-%02d", hourValue, next)
         }
 
         var totals = Dictionary(uniqueKeysWithValues: labels.map { ($0, 0) })
         for session in sessions {
             guard calendar.isDate(session.startTime, inSameDayAs: now) else { continue }
             let hour = calendar.component(.hour, from: session.startTime)
-            let key = String(format: "%02d", hour)
+            let bucketStart = (hour / 2) * 2
+            let key = String(format: "%02d-%02d", bucketStart, (bucketStart + 2) % 24)
             totals[key, default: 0] += session.durationSeconds
         }
 
@@ -98,13 +93,27 @@ enum StatsCalculator {
 
     private static func monthBuckets(sessions: [FocusSession], now: Date, calendar: Calendar) -> [TimeBucket] {
         let range = calendar.range(of: .day, in: .month, for: now) ?? 1..<32
-        let labels = range.map { "\($0)" }
+        let days = Array(range)
+        let groups = stride(from: 0, to: days.count, by: 3).map { index -> ClosedRange<Int> in
+            let first = days[index]
+            let last = days[min(index + 2, days.count - 1)]
+            return first...last
+        }
+        let labels = groups.map { group in
+            if group.lowerBound == group.upperBound {
+                return "\(group.lowerBound)"
+            }
+            return "\(group.lowerBound)-\(group.upperBound)"
+        }
         var totals = Dictionary(uniqueKeysWithValues: labels.map { ($0, 0) })
 
         for session in sessions {
             guard calendar.isDate(session.startTime, equalTo: now, toGranularity: .month) else { continue }
             let day = calendar.component(.day, from: session.startTime)
-            totals["\(day)", default: 0] += session.durationSeconds
+            let groupIndex = max(0, (day - 1) / 3)
+            let group = groups[min(groupIndex, groups.count - 1)]
+            let label = group.lowerBound == group.upperBound ? "\(group.lowerBound)" : "\(group.lowerBound)-\(group.upperBound)"
+            totals[label, default: 0] += session.durationSeconds
         }
 
         return labels.map { TimeBucket(label: $0, totalSeconds: totals[$0, default: 0]) }

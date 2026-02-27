@@ -20,6 +20,7 @@ struct FocusTimerView: View {
             Text(displayTime)
                 .font(.system(size: 58, weight: .bold, design: .rounded))
                 .monospacedDigit()
+                .foregroundStyle(timerColor)
 
             if !currentTask.isEmpty {
                 Text("任务：\(currentTask)")
@@ -74,5 +75,16 @@ struct FocusTimerView: View {
         let minute = (seconds % 3600) / 60
         let second = seconds % 60
         return String(format: "%02d:%02d:%02d", hour, minute, second)
+    }
+
+    private var timerColor: Color {
+        switch phase {
+        case .focusing:
+            return .red
+        case .breaking:
+            return .green
+        default:
+            return .primary
+        }
     }
 }
