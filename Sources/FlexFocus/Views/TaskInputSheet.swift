@@ -23,16 +23,22 @@ struct TaskInputSheet: View {
                     .foregroundStyle(.secondary)
 
                 ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8)], spacing: 8) {
+                    LazyVStack(alignment: .leading, spacing: 6) {
                         ForEach(quickTasks, id: \.self) { task in
-                            Button(task) {
+                            Button {
                                 inputTask = task
+                            } label: {
+                                Text(task)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(.plain)
+                            .padding(.vertical, 6)
+                            Divider()
                         }
                     }
                 }
-                .frame(maxHeight: 140)
+                .frame(maxHeight: 220)
             }
 
             HStack {

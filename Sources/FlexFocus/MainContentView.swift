@@ -91,8 +91,6 @@ struct MainContentView: View {
                 seen.insert(task)
                 return true
             }
-            .prefix(12)
-            .map { $0 }
     }
 
     private func endFocusAndPersist() {
