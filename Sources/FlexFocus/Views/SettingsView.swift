@@ -28,7 +28,14 @@ struct SettingsView: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                TextField("搜索屏蔽词汇", text: $vocabularySearchText)
+                Picker("词汇模式", selection: $settings.vocabularyModeRawValue) {
+                    ForEach(VocabularyFilterMode.allCases) { mode in
+                        Text(mode.title).tag(mode.rawValue)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                TextField(searchPlaceholder, text: $vocabularySearchText)
                     .textFieldStyle(.roundedBorder)
 
                 List(filteredVocabulary, id: \.self, selection: $selectedVocabularyWord) { word in
@@ -46,7 +53,7 @@ struct SettingsView: View {
 
                     Button {
                         if let selectedVocabularyWord {
-                            settings.removeBlockedWord(selectedVocabularyWord)
+                            settings.removeCurrentModeWord(selectedVocabularyWord)
                             self.selectedVocabularyWord = nil
                         }
                     } label: {
@@ -57,12 +64,12 @@ struct SettingsView: View {
                     Spacer()
 
                     Button("重置默认") {
-                        settings.resetDefaultBlockedWords()
+                        settings.resetCurrentModeWords()
                         selectedVocabularyWord = nil
                     }
                 }
 
-                Text("可删除任意屏蔽词汇（包括默认词）；点击“重置默认”可恢复。")
+                Text(modeFootnote)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -84,7 +91,7 @@ struct SettingsView: View {
                         showAddVocabularySheet = false
                     }
                     Button("添加") {
-                        settings.addBlockedWord(newVocabularyWord)
+                        settings.addCurrentModeWord(newVocabularyWord)
                         showAddVocabularySheet = false
                     }
                     .buttonStyle(.borderedProminent)
@@ -100,11 +107,38 @@ struct SettingsView: View {
                 NotificationCenter.default.post(name: .clearAllHistoryRequested, object: nil)
             }
         }
+        .onChange(of: settings.vocabularyModeRawValue) { _, _ in
+            selectedVocabularyWord = nil
+            vocabularySearchText = ""
+        }
     }
 
     private var filteredVocabulary: [String] {
         let query = vocabularySearchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !query.isEmpty else { return settings.blockedWordsList }
-        return settings.blockedWordsList.filter { $0.localizedCaseInsensitiveContains(query) }
+        let source = settings.currentModeWordsList
+        guard !query.isEmpty else { return source }
+        return source.filter { $0.localizedCaseInsensitiveContains(query) }
+    }
+
+    private var currentMode: VocabularyFilterMode {
+        VocabularyFilterMode(rawValue: settings.vocabularyModeRawValue) ?? .blacklist
+    }
+
+    private var searchPlaceholder: String {
+        switch currentMode {
+        case .blacklist:
+            return "搜索屏蔽词汇"
+        case .whitelist:
+            return "搜索白名单词汇"
+        }
+    }
+
+    private var modeFootnote: String {
+        switch currentMode {
+        case .blacklist:
+            return "黑名单模式：命中这些词汇将被过滤；可通过“重置默认”恢复默认屏蔽词汇。"
+        case .whitelist:
+            return "白名单模式：仅统计白名单词汇；“重置默认”会清空白名单。"
+        }
     }
 }

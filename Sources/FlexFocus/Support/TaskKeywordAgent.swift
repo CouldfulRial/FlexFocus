@@ -12,10 +12,12 @@ struct TaskKeywordAgent {
         let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalized.isEmpty else { return [] }
         let blockedWords = blockedWordsSet()
+        let whitelistWords = whitelistWordsSet()
+        let mode = AppSettings.shared.vocabularyMode
 
         let candidates = tokenize(normalized)
             .map(cleanToken)
-            .filter { isKeyword($0, blockedWords: blockedWords) }
+            .filter { isKeyword($0, mode: mode, blockedWords: blockedWords, whitelistWords: whitelistWords) }
 
         var seen = Set<String>()
         var unique: [String] = []
@@ -29,6 +31,10 @@ struct TaskKeywordAgent {
 
     private func blockedWordsSet() -> Set<String> {
         Set(AppSettings.shared.blockedWordsList.map { $0.lowercased() })
+    }
+
+    private func whitelistWordsSet() -> Set<String> {
+        Set(AppSettings.shared.whitelistWordsList.map { $0.lowercased() })
     }
 
     private func cleanToken(_ token: String) -> String {
@@ -78,9 +84,20 @@ struct TaskKeywordAgent {
         (0x4E00...0x9FFF).contains(Int(scalar.value))
     }
 
-    private func isKeyword(_ token: String, blockedWords: Set<String>) -> Bool {
+    private func isKeyword(
+        _ token: String,
+        mode: VocabularyFilterMode,
+        blockedWords: Set<String>,
+        whitelistWords: Set<String>
+    ) -> Bool {
         guard !token.isEmpty else { return false }
-        guard !blockedWords.contains(token) else { return false }
+
+        switch mode {
+        case .blacklist:
+            guard !blockedWords.contains(token) else { return false }
+        case .whitelist:
+            guard whitelistWords.contains(token) else { return false }
+        }
 
         let hasCJK = token.unicodeScalars.contains { scalar in
             isCJK(scalar)
