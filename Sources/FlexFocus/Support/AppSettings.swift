@@ -134,7 +134,7 @@ final class AppSettings: @unchecked Sendable {
 
     private static func parseWordList(_ raw: String) -> [String] {
         raw
-            .components(separatedBy: CharacterSet(charactersIn: ",，;；\n\t "))
+            .components(separatedBy: CharacterSet(charactersIn: ",，;；\n\t"))
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
             .filter { !$0.isEmpty }
             .reduce(into: [String]()) { partial, word in
