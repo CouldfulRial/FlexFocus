@@ -14,6 +14,7 @@ final class FocusViewModel {
     private var timer: Timer?
     private let focusModeService = FocusModeService()
     private let settings = AppSettings.shared
+    private let menuBarTimerState = MenuBarTimerState.shared
 
     var isFocusing: Bool {
         if case .focusing = phase { return true }
@@ -37,9 +38,12 @@ final class FocusViewModel {
         phase = .focusing
         isTaskSheetPresented = false
         focusModeService.activateFocusMode()
+        menuBarTimerState.setFocus(seconds: elapsedFocusSeconds)
 
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            self?.elapsedFocusSeconds += 1
+            guard let self else { return }
+            self.elapsedFocusSeconds += 1
+            self.menuBarTimerState.setFocus(seconds: self.elapsedFocusSeconds)
         }
     }
 
@@ -58,6 +62,7 @@ final class FocusViewModel {
             durationSeconds: duration
         )
         phase = .awaitingBreakConfirmation(completed)
+        menuBarTimerState.reset()
     }
 
     func confirmBreak() {
@@ -66,10 +71,12 @@ final class FocusViewModel {
         remainingBreakSeconds = max(60, completed.durationSeconds / 5)
         phase = .breaking
         let shouldNotifyWhenDone = settings.enableBreakNotification
+        menuBarTimerState.setBreak(remainingSeconds: remainingBreakSeconds)
 
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.remainingBreakSeconds = max(0, self.remainingBreakSeconds - 1)
+            self.menuBarTimerState.setBreak(remainingSeconds: self.remainingBreakSeconds)
             if self.remainingBreakSeconds == 0 {
                 if shouldNotifyWhenDone {
                     NotificationService.shared.sendBreakFinishedNotification()
@@ -97,6 +104,7 @@ final class FocusViewModel {
         elapsedFocusSeconds = 0
         remainingBreakSeconds = 0
         focusStartTime = nil
+        menuBarTimerState.reset()
     }
 
     private func stopTimer() {
