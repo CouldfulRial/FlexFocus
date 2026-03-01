@@ -4,41 +4,90 @@ import AppKit
 import Combine
 
 struct MainContentView: View {
+    static let leftSidebarMinWidth: CGFloat = 300
+    static let rightSidebarMinWidth: CGFloat = 360
+    static let centerMinWidth: CGFloat = 380
+    static let splitterWidth: CGFloat = 8
+    private static let statsHeaderHeight: CGFloat = 72
+    private static let statsSectionSpacing: CGFloat = 12
+    private static let statsOuterPadding: CGFloat = 12
+    private static let statsSectionMinHeight: CGFloat = 180
+
+    static let minimumWindowWidth: CGFloat = leftSidebarMinWidth + rightSidebarMinWidth + centerMinWidth + (splitterWidth * 2)
+    static let minimumWindowHeight: CGFloat = statsHeaderHeight + (statsSectionSpacing * 2) + (statsOuterPadding * 2) + (statsSectionMinHeight * 3)
+
+    private let leftSidebarMinWidth = Self.leftSidebarMinWidth
+    private let rightSidebarMinWidth = Self.rightSidebarMinWidth
+    private let centerMinWidth = Self.centerMinWidth
+    private let splitterWidth = Self.splitterWidth
+
     @State private var sessions: [FocusSession] = []
     @State private var viewModel = FocusViewModel()
     @State private var taskInput = ""
     @State private var selectedRange: StatisticsRange = .week
     @State private var didConfigureWindow = false
+    @State private var leftSidebarWidth: CGFloat = 320
+    @State private var rightSidebarWidth: CGFloat = 380
+    @State private var leftDragStartWidth: CGFloat?
+    @State private var rightDragStartWidth: CGFloat?
     private let sessionStore = SessionStore()
 
     var body: some View {
-        HSplitView {
-            StatsSidebarView(
-                sessions: sessions,
-                selectedRange: $selectedRange
-            )
-            .frame(minWidth: 300)
+        GeometryReader { proxy in
+            let totalWidth = proxy.size.width
+            let leftWidth = clampedLeftWidth(totalWidth: totalWidth)
+            let rightWidth = clampedRightWidth(totalWidth: totalWidth)
 
-            FocusTimerView(
-                phase: viewModel.phase,
-                elapsedFocusSeconds: viewModel.elapsedFocusSeconds,
-                remainingBreakSeconds: viewModel.remainingBreakSeconds,
-                currentTask: viewModel.currentTask,
-                onStart: {
-                    NSApplication.shared.activate(ignoringOtherApps: true)
-                    viewModel.openTaskInput()
-                },
-                onEndFocus: { endFocusAndPersist() },
-                onSkipBreak: { viewModel.skipBreak() }
-            )
-            .frame(minWidth: 380)
+            ZStack {
+                FocusTimerView(
+                    phase: viewModel.phase,
+                    elapsedFocusSeconds: viewModel.elapsedFocusSeconds,
+                    remainingBreakSeconds: viewModel.remainingBreakSeconds,
+                    currentTask: viewModel.currentTask,
+                    onStart: {
+                        NSApplication.shared.activate(ignoringOtherApps: true)
+                        viewModel.openTaskInput()
+                    },
+                    onEndFocus: { endFocusAndPersist() },
+                    onSkipBreak: { viewModel.skipBreak() }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 
-            FocusHistoryView(
-                sessions: sessions,
-                onUpdateTask: updateSessionTask,
-                onDeleteSession: deleteSession
-            )
-                .frame(minWidth: 360)
+                HStack(spacing: 0) {
+                    StatsSidebarView(
+                        sessions: sessions,
+                        selectedRange: $selectedRange
+                    )
+                    .frame(width: leftWidth)
+                    .frame(maxHeight: .infinity)
+
+                    sidebarSplitterHandle()
+                        .gesture(leftSidebarDragGesture(totalWidth: totalWidth))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .animation(nil, value: leftSidebarWidth)
+
+                HStack(spacing: 0) {
+                    sidebarSplitterHandle()
+                        .gesture(rightSidebarDragGesture(totalWidth: totalWidth))
+
+                    FocusHistoryView(
+                        sessions: sessions,
+                        onUpdateTask: updateSessionTask,
+                        onDeleteSession: deleteSession
+                    )
+                    .frame(width: rightWidth)
+                    .frame(maxHeight: .infinity)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                .animation(nil, value: rightSidebarWidth)
+            }
+            .onAppear {
+                normalizeSidebarWidths(totalWidth: totalWidth)
+            }
+            .onChange(of: totalWidth) { _, newValue in
+                normalizeSidebarWidths(totalWidth: newValue)
+            }
         }
         .sheet(isPresented: $viewModel.isTaskSheetPresented) {
             TaskInputSheet(
@@ -147,8 +196,80 @@ struct MainContentView: View {
         DispatchQueue.main.async {
             NSApplication.shared.activate(ignoringOtherApps: true)
             guard let window = NSApplication.shared.windows.first else { return }
+            window.minSize = NSSize(width: Self.minimumWindowWidth, height: Self.minimumWindowHeight)
             window.center()
             window.makeKeyAndOrderFront(nil)
         }
+    }
+
+    private func sidebarSplitterHandle() -> some View {
+        Rectangle()
+            .fill(Color(nsColor: .separatorColor).opacity(0.45))
+            .frame(width: splitterWidth)
+            .contentShape(Rectangle())
+    }
+
+    private func maxSidebarWidth(totalWidth: CGFloat) -> CGFloat {
+        max(leftSidebarMinWidth, (totalWidth - centerMinWidth) / 2 - splitterWidth)
+    }
+
+    private func clampedLeftWidth(totalWidth: CGFloat) -> CGFloat {
+        snapped(min(max(leftSidebarWidth, leftSidebarMinWidth), maxSidebarWidth(totalWidth: totalWidth)))
+    }
+
+    private func clampedRightWidth(totalWidth: CGFloat) -> CGFloat {
+        snapped(min(max(rightSidebarWidth, rightSidebarMinWidth), maxSidebarWidth(totalWidth: totalWidth)))
+    }
+
+    private func normalizeSidebarWidths(totalWidth: CGFloat) {
+        let left = clampedLeftWidth(totalWidth: totalWidth)
+        let right = clampedRightWidth(totalWidth: totalWidth)
+
+        if leftSidebarWidth != left {
+            leftSidebarWidth = left
+        }
+        if rightSidebarWidth != right {
+            rightSidebarWidth = right
+        }
+    }
+
+    private func leftSidebarDragGesture(totalWidth: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+            .onChanged { value in
+                if leftDragStartWidth == nil {
+                    leftDragStartWidth = leftSidebarWidth
+                }
+
+                let start = leftDragStartWidth ?? leftSidebarWidth
+                let maxLeft = maxSidebarWidth(totalWidth: totalWidth)
+                let next = min(max(start + value.translation.width, leftSidebarMinWidth), maxLeft)
+                leftSidebarWidth = snapped(next)
+            }
+            .onEnded { _ in
+                leftDragStartWidth = nil
+                normalizeSidebarWidths(totalWidth: totalWidth)
+            }
+    }
+
+    private func rightSidebarDragGesture(totalWidth: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+            .onChanged { value in
+                if rightDragStartWidth == nil {
+                    rightDragStartWidth = rightSidebarWidth
+                }
+
+                let start = rightDragStartWidth ?? rightSidebarWidth
+                let maxRight = maxSidebarWidth(totalWidth: totalWidth)
+                let next = min(max(start - value.translation.width, rightSidebarMinWidth), maxRight)
+                rightSidebarWidth = snapped(next)
+            }
+            .onEnded { _ in
+                rightDragStartWidth = nil
+                normalizeSidebarWidths(totalWidth: totalWidth)
+            }
+    }
+
+    private func snapped(_ value: CGFloat) -> CGFloat {
+        (value * 2).rounded() / 2
     }
 }

@@ -13,10 +13,15 @@ struct StatsSidebarView: View {
     @Binding var selectedRange: StatisticsRange
     private let wordCloudSize = CGSize(width: 280, height: 210)
     private let pieSize = CGSize(width: 280, height: 210)
+    private let sectionSpacing: CGFloat = 12
+    private let outerPadding: CGFloat = 12
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+        GeometryReader { proxy in
+            let availableHeight = max(120, proxy.size.height - 72 - (sectionSpacing * 2) - (outerPadding * 2))
+            let sectionHeight = max(120, availableHeight / 3)
+
+            VStack(alignment: .leading, spacing: sectionSpacing) {
                 Picker("统计范围", selection: $selectedRange) {
                     ForEach(StatisticsRange.allCases) { range in
                         Text(range.rawValue).tag(range)
@@ -44,14 +49,19 @@ struct StatsSidebarView: View {
                             }
                         }
                     }
-                    .frame(height: 180)
                 }
+                .frame(maxWidth: .infinity, maxHeight: sectionHeight)
 
                 VStack(alignment: .leading, spacing: 8) {
                     Label("任务词云", systemImage: "cloud")
                         .font(.headline)
-                    WordCloudCanvasView(stats: wordStats, width: wordCloudSize.width, height: wordCloudSize.height)
+                    WordCloudCanvasView(
+                        stats: wordStats,
+                        width: max(120, proxy.size.width - (outerPadding * 2)),
+                        height: max(120, sectionHeight - 32)
+                    )
                 }
+                .frame(maxWidth: .infinity, maxHeight: sectionHeight)
 
                 VStack(alignment: .leading, spacing: 8) {
                     Label("专注占比", systemImage: "chart.pie")
@@ -79,10 +89,11 @@ struct StatsSidebarView: View {
                             }
                         }
                     }
-                    .frame(width: pieSize.width, height: pieSize.height)
+                    .frame(width: max(120, proxy.size.width - (outerPadding * 2)), height: max(120, sectionHeight - 32))
                 }
+                .frame(maxWidth: .infinity, maxHeight: sectionHeight)
             }
-            .padding()
+            .padding(outerPadding)
         }
     }
 

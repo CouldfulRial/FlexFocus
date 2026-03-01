@@ -19,8 +19,10 @@ struct FlexFocusApp: App {
     var body: some Scene {
         WindowGroup {
             MainContentView()
+                .frame(minWidth: MainContentView.minimumWindowWidth, minHeight: MainContentView.minimumWindowHeight)
         }
         .defaultSize(width: 1520, height: 920)
+        .windowResizability(.contentMinSize)
 
         Settings {
             SettingsView()
