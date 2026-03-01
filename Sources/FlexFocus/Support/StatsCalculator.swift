@@ -5,8 +5,16 @@ struct TimeBucket: Identifiable {
     let start: Date
     let end: Date
     let totalSeconds: Int
+    let previousSeconds: Int
 
     var id: String { label }
+
+    var changeRatio: Double {
+        if previousSeconds == 0 {
+            return totalSeconds > 0 ? 1.0 : 0
+        }
+        return Double(totalSeconds - previousSeconds) / Double(previousSeconds)
+    }
 }
 
 struct StatsWindow {
@@ -71,7 +79,24 @@ enum StatsCalculator {
                     bucketEnd: raw.end
                 )
             }
-            return TimeBucket(label: raw.label, start: raw.start, end: raw.end, totalSeconds: total)
+
+            let previousInterval = previousComparisonInterval(for: range, start: raw.start, end: raw.end, calendar: calendar)
+            let previousTotal = sessions.reduce(0) { partial, session in
+                partial + overlapSeconds(
+                    sessionStart: session.startTime,
+                    sessionEnd: session.endTime,
+                    bucketStart: previousInterval.start,
+                    bucketEnd: previousInterval.end
+                )
+            }
+
+            return TimeBucket(
+                label: raw.label,
+                start: raw.start,
+                end: raw.end,
+                totalSeconds: total,
+                previousSeconds: previousTotal
+            )
         }
     }
 
@@ -152,5 +177,26 @@ enum StatsCalculator {
         let end = min(sessionEnd, bucketEnd)
         guard end > start else { return 0 }
         return Int(end.timeIntervalSince(start))
+    }
+
+    private static func previousComparisonInterval(for range: StatisticsRange, start: Date, end: Date, calendar: Calendar) -> (start: Date, end: Date) {
+        switch range {
+        case .hour:
+            let previousStart = calendar.date(byAdding: .day, value: -1, to: start) ?? start
+            let previousEnd = calendar.date(byAdding: .day, value: -1, to: end) ?? end
+            return (previousStart, previousEnd)
+        case .day:
+            let previousStart = calendar.date(byAdding: .day, value: -7, to: start) ?? start
+            let previousEnd = calendar.date(byAdding: .day, value: -7, to: end) ?? end
+            return (previousStart, previousEnd)
+        case .week:
+            let previousStart = calendar.date(byAdding: .weekOfYear, value: -1, to: start) ?? start
+            let previousEnd = calendar.date(byAdding: .weekOfYear, value: -1, to: end) ?? end
+            return (previousStart, previousEnd)
+        case .month:
+            let previousStart = calendar.date(byAdding: .month, value: -1, to: start) ?? start
+            let previousEnd = calendar.date(byAdding: .month, value: -1, to: end) ?? end
+            return (previousStart, previousEnd)
+        }
     }
 }

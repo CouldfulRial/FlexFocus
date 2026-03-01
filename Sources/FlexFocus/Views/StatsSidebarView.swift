@@ -42,10 +42,25 @@ struct StatsSidebarView: View {
                     Label("专注时长", systemImage: "chart.bar")
                         .font(.headline)
                     Chart(timeBuckets) { bucket in
+                        if shouldHighlightBucketBackground(bucket) {
+                            RectangleMark(
+                                x: .value("区间", bucket.label),
+                                yStart: .value("基线", 0),
+                                yEnd: .value("高度", maxChartY)
+                            )
+                            .foregroundStyle(Color.green.opacity(0.12))
+                        }
+
                         BarMark(
                             x: .value("区间", bucket.label),
                             y: .value("时长", bucket.totalSeconds)
                         )
+                        .foregroundStyle(changeColor(for: bucket))
+                        .annotation(position: .top) {
+                            Text(changeText(for: bucket))
+                                .font(.caption2)
+                                .foregroundStyle(changeColor(for: bucket))
+                        }
                     }
                     .chartXAxis {
                         AxisMarks(values: .automatic(desiredCount: max(2, timeBuckets.count))) { _ in
@@ -196,6 +211,46 @@ struct StatsSidebarView: View {
             return "\(seconds / 60)m"
         }
         return "\(seconds)s"
+    }
+
+    private var maxChartY: Int {
+        max(1, Int(Double(timeBuckets.map(\.totalSeconds).max() ?? 0) * 1.1))
+    }
+
+    private func changeText(for bucket: TimeBucket) -> String {
+        let percent = bucket.changeRatio * 100
+        return String(format: "%.0f", abs(percent))
+    }
+
+    private func changeColor(for bucket: TimeBucket) -> Color {
+        if bucket.changeRatio > 0 {
+            return .green
+        }
+        if bucket.changeRatio < 0 {
+            return .red
+        }
+        return .secondary
+    }
+
+    private func isWorkingHourBucket(_ bucket: TimeBucket) -> Bool {
+        let hour = calendar.component(.hour, from: bucket.start)
+        return hour >= 9 && hour < 17
+    }
+
+    private func isWorkdayBucket(_ bucket: TimeBucket) -> Bool {
+        let weekday = calendar.component(.weekday, from: bucket.start)
+        return weekday >= 2 && weekday <= 6
+    }
+
+    private func shouldHighlightBucketBackground(_ bucket: TimeBucket) -> Bool {
+        switch selectedRange {
+        case .hour:
+            return isWorkingHourBucket(bucket)
+        case .day:
+            return isWorkdayBucket(bucket)
+        case .week, .month:
+            return false
+        }
     }
 
     private var statsWindow: StatsWindow {
