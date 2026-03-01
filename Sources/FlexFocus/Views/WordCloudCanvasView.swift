@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 private struct PlacedWord: Identifiable {
-    let id = UUID()
+    let id: String
     let stat: WordStat
     let rect: CGRect
     let isVertical: Bool
@@ -28,6 +28,8 @@ struct WordCloudCanvasView: View {
     let width: CGFloat
     let height: CGFloat
     @Environment(\.colorScheme) private var colorScheme
+    @State private var cachedWords: [PlacedWord] = []
+    @State private var cachedSignature = ""
 
     private var colors: [Color] {
         [
@@ -46,7 +48,7 @@ struct WordCloudCanvasView: View {
         ZStack {
             Color.clear
 
-            ForEach(layoutWords(in: CGSize(width: width, height: height))) { item in
+            ForEach(cachedWords) { item in
                 Text(item.stat.word)
                     .font(.system(size: item.fontSize, weight: .semibold))
                     .foregroundStyle(item.color)
@@ -63,6 +65,27 @@ struct WordCloudCanvasView: View {
         .frame(width: width, height: height)
         .clipped()
         .accessibilityElement(children: .contain)
+        .onAppear {
+            updateLayoutIfNeeded()
+        }
+        .onChange(of: layoutSignature) { _, _ in
+            updateLayoutIfNeeded()
+        }
+    }
+
+    private var layoutSignature: String {
+        let statsKey = stats
+            .map { "\($0.word)|\($0.frequency)|\(Int($0.totalSeconds.rounded()))" }
+            .joined(separator: ";")
+        let widthKey = Int(width.rounded())
+        let heightKey = Int(height.rounded())
+        return "\(widthKey)x\(heightKey)|\(statsKey)"
+    }
+
+    private func updateLayoutIfNeeded() {
+        guard cachedSignature != layoutSignature else { return }
+        cachedSignature = layoutSignature
+        cachedWords = layoutWords(in: CGSize(width: width, height: height))
     }
 
     private func layoutWords(in size: CGSize) -> [PlacedWord] {
@@ -119,6 +142,7 @@ struct WordCloudCanvasView: View {
 
                 if occupied.allSatisfy({ !$0.intersects(rect) }) {
                     let item = PlacedWord(
+                        id: stat.id,
                         stat: stat,
                         rect: rect.insetBy(dx: 2, dy: 2),
                         isVertical: isVertical,

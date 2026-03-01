@@ -27,6 +27,11 @@ struct FocusTimerView: View {
                 Text("任务：\(currentTask)")
                     .font(.title3)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 560)
+                    .padding(.horizontal, 12)
             }
 
             HStack(spacing: 12) {
