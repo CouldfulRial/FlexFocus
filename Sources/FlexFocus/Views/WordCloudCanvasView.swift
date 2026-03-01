@@ -29,7 +29,9 @@ struct WordCloudCanvasView: View {
     let height: CGFloat
     @Environment(\.colorScheme) private var colorScheme
     @State private var cachedWords: [PlacedWord] = []
-    @State private var cachedSignature = ""
+    @State private var cachedStatsSignature = ""
+    @State private var cachedSizeBucket = ""
+    @State private var cachedThemeSignature = ""
 
     private var colors: [Color] {
         [
@@ -66,25 +68,46 @@ struct WordCloudCanvasView: View {
         .clipped()
         .accessibilityElement(children: .contain)
         .onAppear {
-            updateLayoutIfNeeded()
+            updateLayoutIfNeeded(forceDataRefresh: true)
         }
-        .onChange(of: layoutSignature) { _, _ in
-            updateLayoutIfNeeded()
+        .onChange(of: statsSignature) { _, _ in
+            updateLayoutIfNeeded(forceDataRefresh: true)
+        }
+        .onChange(of: sizeBucketSignature) { _, _ in
+            updateLayoutIfNeeded(forceDataRefresh: false)
+        }
+        .onChange(of: themeSignature) { _, _ in
+            updateLayoutIfNeeded(forceDataRefresh: true)
         }
     }
 
-    private var layoutSignature: String {
-        let statsKey = stats
+    private var statsSignature: String {
+        stats
+            .sorted { $0.word.localizedCompare($1.word) == .orderedAscending }
             .map { "\($0.word)|\($0.frequency)|\(Int($0.totalSeconds.rounded()))" }
             .joined(separator: ";")
-        let widthKey = Int(width.rounded())
-        let heightKey = Int(height.rounded())
-        return "\(widthKey)x\(heightKey)|\(statsKey)"
     }
 
-    private func updateLayoutIfNeeded() {
-        guard cachedSignature != layoutSignature else { return }
-        cachedSignature = layoutSignature
+    private var sizeBucketSignature: String {
+        let widthBucket = Int((max(1, width) / 24).rounded(.down))
+        let heightBucket = Int((max(1, height) / 24).rounded(.down))
+        return "\(widthBucket)x\(heightBucket)"
+    }
+
+    private var themeSignature: String {
+        let scheme = colorScheme == .dark ? "dark" : "light"
+        let inverted = AppSettings.shared.invertThemeColorsInDarkMode ? "inv" : "keep"
+        return "\(scheme)-\(inverted)"
+    }
+
+    private func updateLayoutIfNeeded(forceDataRefresh: Bool) {
+        let dataChanged = cachedStatsSignature != statsSignature || cachedThemeSignature != themeSignature
+        let sizeBucketChanged = cachedSizeBucket != sizeBucketSignature
+        guard dataChanged || (sizeBucketChanged && !forceDataRefresh) || forceDataRefresh else { return }
+
+        cachedStatsSignature = statsSignature
+        cachedSizeBucket = sizeBucketSignature
+        cachedThemeSignature = themeSignature
         cachedWords = layoutWords(in: CGSize(width: width, height: height))
     }
 

@@ -5,6 +5,7 @@ struct FocusTimerView: View {
     let elapsedFocusSeconds: Int
     let remainingBreakSeconds: Int
     let currentTask: String
+    let contentMaxWidth: CGFloat
     let onStart: () -> Void
     let onEndFocus: () -> Void
     let onSkipBreak: () -> Void
@@ -30,7 +31,7 @@ struct FocusTimerView: View {
                     .multilineTextAlignment(.center)
                     .lineLimit(nil)
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 560)
+                        .frame(maxWidth: max(220, contentMaxWidth - 40))
                     .padding(.horizontal, 12)
             }
 
@@ -51,6 +52,7 @@ struct FocusTimerView: View {
 
             Spacer()
         }
+        .frame(maxWidth: contentMaxWidth)
         .padding()
     }
 

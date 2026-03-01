@@ -140,6 +140,9 @@ enum StatsCalculator {
             }
             .sorted { lhs, rhs in
                 if lhs.frequency == rhs.frequency {
+                    if lhs.totalSeconds == rhs.totalSeconds {
+                        return lhs.word.localizedCompare(rhs.word) == .orderedAscending
+                    }
                     return lhs.totalSeconds > rhs.totalSeconds
                 }
                 return lhs.frequency > rhs.frequency

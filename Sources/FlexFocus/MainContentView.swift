@@ -37,6 +37,10 @@ struct MainContentView: View {
             let totalWidth = proxy.size.width
             let leftWidth = clampedLeftWidth(totalWidth: totalWidth)
             let rightWidth = clampedRightWidth(totalWidth: totalWidth)
+            let centerVisibleWidth = max(
+                centerMinWidth,
+                totalWidth - leftWidth - rightWidth - (splitterWidth * 2) - 24
+            )
 
             ZStack {
                 FocusTimerView(
@@ -44,6 +48,7 @@ struct MainContentView: View {
                     elapsedFocusSeconds: viewModel.elapsedFocusSeconds,
                     remainingBreakSeconds: viewModel.remainingBreakSeconds,
                     currentTask: viewModel.currentTask,
+                    contentMaxWidth: centerVisibleWidth,
                     onStart: {
                         NSApplication.shared.activate(ignoringOtherApps: true)
                         viewModel.openTaskInput()
@@ -51,6 +56,7 @@ struct MainContentView: View {
                     onEndFocus: { endFocusAndPersist() },
                     onSkipBreak: { viewModel.skipBreak() }
                 )
+                .frame(width: centerVisibleWidth)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 
                 HStack(spacing: 0) {
