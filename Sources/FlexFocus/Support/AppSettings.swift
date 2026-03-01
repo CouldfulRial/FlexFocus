@@ -41,16 +41,16 @@ final class AppSettings: @unchecked Sendable {
     static let shared = AppSettings()
 
     var enableDNDOnFocusStart: Bool {
-        didSet { defaults.set(enableDNDOnFocusStart, forKey: Keys.enableDNDOnFocusStart) }
+        didSet { persistProfile() }
     }
 
     var disableDNDOnFocusEnd: Bool {
-        didSet { defaults.set(disableDNDOnFocusEnd, forKey: Keys.disableDNDOnFocusEnd) }
+        didSet { persistProfile() }
     }
 
     var enableBreakNotification: Bool {
         didSet {
-            defaults.set(enableBreakNotification, forKey: Keys.enableBreakNotification)
+            persistProfile()
             if enableBreakNotification {
                 NotificationService.shared.requestAuthorizationIfNeeded()
             }
@@ -58,33 +58,23 @@ final class AppSettings: @unchecked Sendable {
     }
 
     var blockedWordsList: [String] {
-        didSet {
-            defaults.set(blockedWordsList.joined(separator: ","), forKey: Keys.blockedWords)
-        }
+        didSet { persistProfile() }
     }
 
     var whitelistWordsList: [String] {
-        didSet {
-            defaults.set(whitelistWordsList.joined(separator: ","), forKey: Keys.whitelistWords)
-        }
+        didSet { persistProfile() }
     }
 
     var vocabularyModeRawValue: String {
-        didSet {
-            defaults.set(vocabularyModeRawValue, forKey: Keys.vocabularyMode)
-        }
+        didSet { persistProfile() }
     }
 
     var themeModeRawValue: String {
-        didSet {
-            defaults.set(themeModeRawValue, forKey: Keys.themeMode)
-        }
+        didSet { persistProfile() }
     }
 
     var invertThemeColorsInDarkMode: Bool {
-        didSet {
-            defaults.set(invertThemeColorsInDarkMode, forKey: Keys.invertThemeColorsInDarkMode)
-        }
+        didSet { persistProfile() }
     }
 
     var vocabularyMode: VocabularyFilterMode {
@@ -106,7 +96,20 @@ final class AppSettings: @unchecked Sendable {
         set { themeModeRawValue = newValue.rawValue }
     }
 
-    private let defaults: UserDefaults
+    private let profileURL: URL
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
+
+    private struct SettingsProfile: Codable {
+        var enableDNDOnFocusStart: Bool
+        var disableDNDOnFocusEnd: Bool
+        var enableBreakNotification: Bool
+        var blockedWordsList: [String]
+        var whitelistWordsList: [String]
+        var vocabularyModeRawValue: String
+        var themeModeRawValue: String
+        var invertThemeColorsInDarkMode: Bool
+    }
 
     private enum Keys {
         static let enableDNDOnFocusStart = "settings.enableDNDOnFocusStart"
@@ -119,21 +122,26 @@ final class AppSettings: @unchecked Sendable {
         static let invertThemeColorsInDarkMode = "settings.invertThemeColorsInDarkMode"
     }
 
-    private init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
+    private init() {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let directory = appSupport.appendingPathComponent("FlexFocus", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("settings-profile.json")
+        let initialProfile = Self.loadProfileFromFile(at: url) ?? Self.migrateFromUserDefaults(UserDefaults.standard)
 
-        self.enableDNDOnFocusStart = defaults.object(forKey: Keys.enableDNDOnFocusStart) as? Bool ?? true
-        self.disableDNDOnFocusEnd = defaults.object(forKey: Keys.disableDNDOnFocusEnd) as? Bool ?? true
-        self.enableBreakNotification = defaults.object(forKey: Keys.enableBreakNotification) as? Bool ?? true
-        self.vocabularyModeRawValue = defaults.string(forKey: Keys.vocabularyMode) ?? VocabularyFilterMode.blacklist.rawValue
-        self.themeModeRawValue = defaults.string(forKey: Keys.themeMode) ?? AppThemeMode.system.rawValue
-        self.invertThemeColorsInDarkMode = defaults.object(forKey: Keys.invertThemeColorsInDarkMode) as? Bool ?? true
+        self.profileURL = url
+        self.enableDNDOnFocusStart = initialProfile.enableDNDOnFocusStart
+        self.disableDNDOnFocusEnd = initialProfile.disableDNDOnFocusEnd
+        self.enableBreakNotification = initialProfile.enableBreakNotification
+        self.blockedWordsList = initialProfile.blockedWordsList
+        self.whitelistWordsList = initialProfile.whitelistWordsList
+        self.vocabularyModeRawValue = initialProfile.vocabularyModeRawValue
+        self.themeModeRawValue = initialProfile.themeModeRawValue
+        self.invertThemeColorsInDarkMode = initialProfile.invertThemeColorsInDarkMode
 
-        let blockedStored = Self.parseWordList(defaults.string(forKey: Keys.blockedWords) ?? "")
-        self.blockedWordsList = blockedStored.isEmpty ? TaskKeywordAgent.defaultBlockedWords : blockedStored
-
-        self.whitelistWordsList = Self.parseWordList(defaults.string(forKey: Keys.whitelistWords) ?? "")
-
+        if Self.loadProfileFromFile(at: url) == nil {
+            persistProfile()
+        }
     }
 
     func addCurrentModeWord(_ word: String) {
@@ -182,5 +190,42 @@ final class AppSettings: @unchecked Sendable {
                     partial.append(word)
                 }
             }
+    }
+
+    private static func loadProfileFromFile(at url: URL) -> SettingsProfile? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(SettingsProfile.self, from: data)
+    }
+
+    private func persistProfile() {
+        let profile = SettingsProfile(
+            enableDNDOnFocusStart: enableDNDOnFocusStart,
+            disableDNDOnFocusEnd: disableDNDOnFocusEnd,
+            enableBreakNotification: enableBreakNotification,
+            blockedWordsList: blockedWordsList,
+            whitelistWordsList: whitelistWordsList,
+            vocabularyModeRawValue: vocabularyModeRawValue,
+            themeModeRawValue: themeModeRawValue,
+            invertThemeColorsInDarkMode: invertThemeColorsInDarkMode
+        )
+
+        guard let data = try? encoder.encode(profile) else { return }
+        try? data.write(to: profileURL, options: .atomic)
+    }
+
+    private static func migrateFromUserDefaults(_ defaults: UserDefaults) -> SettingsProfile {
+        let blockedStored = Self.parseWordList(defaults.string(forKey: Keys.blockedWords) ?? "")
+        let blockedWordsList = blockedStored.isEmpty ? TaskKeywordAgent.defaultBlockedWords : blockedStored
+
+        return SettingsProfile(
+            enableDNDOnFocusStart: defaults.object(forKey: Keys.enableDNDOnFocusStart) as? Bool ?? true,
+            disableDNDOnFocusEnd: defaults.object(forKey: Keys.disableDNDOnFocusEnd) as? Bool ?? true,
+            enableBreakNotification: defaults.object(forKey: Keys.enableBreakNotification) as? Bool ?? true,
+            blockedWordsList: blockedWordsList,
+            whitelistWordsList: Self.parseWordList(defaults.string(forKey: Keys.whitelistWords) ?? ""),
+            vocabularyModeRawValue: defaults.string(forKey: Keys.vocabularyMode) ?? VocabularyFilterMode.blacklist.rawValue,
+            themeModeRawValue: defaults.string(forKey: Keys.themeMode) ?? AppThemeMode.system.rawValue,
+            invertThemeColorsInDarkMode: defaults.object(forKey: Keys.invertThemeColorsInDarkMode) as? Bool ?? true
+        )
     }
 }
