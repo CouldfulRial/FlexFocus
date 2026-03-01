@@ -34,22 +34,26 @@ struct WordStat: Identifiable {
 
 enum StatsCalculator {
     static func window(for range: StatisticsRange, reference: Date, calendar: Calendar = .current) -> StatsWindow {
+        let referenceDayStart = calendar.startOfDay(for: reference)
+
         switch range {
         case .hour:
-            let start = calendar.dateInterval(of: .hour, for: reference)?.start ?? reference
-            let end = calendar.date(byAdding: .hour, value: 12, to: start) ?? start
+            let currentHourStart = calendar.dateInterval(of: .hour, for: reference)?.start ?? reference
+            let end = calendar.date(byAdding: .hour, value: 1, to: currentHourStart) ?? currentHourStart
+            let start = calendar.date(byAdding: .hour, value: -12, to: end) ?? end
             return StatsWindow(start: start, end: end)
         case .day:
-            let start = calendar.startOfDay(for: reference)
-            let end = calendar.date(byAdding: .day, value: 7, to: start) ?? start
+            let end = calendar.date(byAdding: .day, value: 1, to: referenceDayStart) ?? referenceDayStart
+            let start = calendar.date(byAdding: .day, value: -7, to: end) ?? end
             return StatsWindow(start: start, end: end)
         case .week:
-            let start = calendar.dateInterval(of: .weekOfYear, for: reference)?.start ?? calendar.startOfDay(for: reference)
-            let end = calendar.date(byAdding: .day, value: 49, to: start) ?? start
+            let end = calendar.date(byAdding: .day, value: 1, to: referenceDayStart) ?? referenceDayStart
+            let start = calendar.date(byAdding: .day, value: -49, to: end) ?? end
             return StatsWindow(start: start, end: end)
         case .month:
-            let start = calendar.dateInterval(of: .month, for: reference)?.start ?? calendar.startOfDay(for: reference)
-            let end = calendar.date(byAdding: .month, value: 12, to: start) ?? start
+            let referenceMonthStart = calendar.dateInterval(of: .month, for: referenceDayStart)?.start ?? referenceDayStart
+            let start = calendar.date(byAdding: .month, value: -11, to: referenceMonthStart) ?? referenceMonthStart
+            let end = calendar.date(byAdding: .day, value: 1, to: referenceDayStart) ?? referenceDayStart
             return StatsWindow(start: start, end: end)
         }
     }
@@ -151,11 +155,10 @@ enum StatsCalculator {
                 return (String(format: "%02d:00", calendar.component(.hour, from: start)), start, end)
             }
         case .day:
-            let symbols = ["一", "二", "三", "四", "五", "六", "日"]
             return (0..<7).map { index in
                 let start = calendar.date(byAdding: .day, value: index, to: window.start) ?? window.start
                 let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start
-                return (symbols[index], start, end)
+                return (weekdayLabel(for: start, calendar: calendar), start, end)
             }
         case .week:
             return (0..<7).map { index in
@@ -177,6 +180,19 @@ enum StatsCalculator {
         let end = min(sessionEnd, bucketEnd)
         guard end > start else { return 0 }
         return Int(end.timeIntervalSince(start))
+    }
+
+    private static func weekdayLabel(for date: Date, calendar: Calendar) -> String {
+        switch calendar.component(.weekday, from: date) {
+        case 1: return "日"
+        case 2: return "一"
+        case 3: return "二"
+        case 4: return "三"
+        case 5: return "四"
+        case 6: return "五"
+        case 7: return "六"
+        default: return "-"
+        }
     }
 
     private static func previousComparisonInterval(for range: StatisticsRange, start: Date, end: Date, calendar: Calendar) -> (start: Date, end: Date) {

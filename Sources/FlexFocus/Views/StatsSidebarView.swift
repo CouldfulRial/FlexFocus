@@ -115,16 +115,13 @@ struct StatsSidebarView: View {
                                     .frame(maxWidth: .infinity, alignment: .trailing)
 
                                 Button {
-                                    rangeReferenceDate = StatsCalculator.shiftedReference(
-                                        from: rangeReferenceDate,
-                                        range: selectedRange,
-                                        step: 1,
-                                        calendar: calendar
-                                    )
+                                    guard canShiftForward else { return }
+                                    rangeReferenceDate = nextReferenceDate
                                 } label: {
                                     Image(systemName: "chevron.right")
                                 }
                                 .buttonStyle(.bordered)
+                                .disabled(!canShiftForward)
                             }
                         }
                     }
@@ -255,6 +252,32 @@ struct StatsSidebarView: View {
 
     private var statsWindow: StatsWindow {
         StatsCalculator.window(for: selectedRange, reference: rangeReferenceDate, calendar: calendar)
+    }
+
+    private var nextReferenceDate: Date {
+        StatsCalculator.shiftedReference(
+            from: rangeReferenceDate,
+            range: selectedRange,
+            step: 1,
+            calendar: calendar
+        )
+    }
+
+    private var canShiftForward: Bool {
+        let nextWindow = StatsCalculator.window(for: selectedRange, reference: nextReferenceDate, calendar: calendar)
+        return nextWindow.end <= maxAllowedEndExclusive
+    }
+
+    private var maxAllowedEndExclusive: Date {
+        let now = Date()
+        switch selectedRange {
+        case .hour:
+            let currentHourStart = calendar.dateInterval(of: .hour, for: now)?.start ?? now
+            return calendar.date(byAdding: .hour, value: 1, to: currentHourStart) ?? currentHourStart
+        case .day, .week, .month:
+            let todayStart = calendar.startOfDay(for: now)
+            return calendar.date(byAdding: .day, value: 1, to: todayStart) ?? todayStart
+        }
     }
 
     private func displayWindowEnd(_ endExclusive: Date) -> Date {
