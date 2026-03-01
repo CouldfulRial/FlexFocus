@@ -8,6 +8,7 @@ struct FocusTimerView: View {
     let onStart: () -> Void
     let onEndFocus: () -> Void
     let onSkipBreak: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(spacing: 20) {
@@ -80,9 +81,9 @@ struct FocusTimerView: View {
     private var timerColor: Color {
         switch phase {
         case .focusing:
-            return .red
+            return ThemePalette.focusColor(for: colorScheme)
         case .breaking:
-            return .green
+            return ThemePalette.breakColor(for: colorScheme)
         default:
             return .primary
         }

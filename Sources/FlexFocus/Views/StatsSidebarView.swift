@@ -1,20 +1,16 @@
 import SwiftUI
 import Charts
 
-private struct PieSlice: Identifiable {
-    let id: String
-    let word: String
-    let totalSeconds: Double
-    let ratio: Double
-}
-
 struct StatsSidebarView: View {
     let sessions: [FocusSession]
     @Binding var selectedRange: StatisticsRange
+    @Environment(\.colorScheme) private var colorScheme
     private let sectionSpacing: CGFloat = 12
     private let outerPadding: CGFloat = 12
     private let topControlHeight: CGFloat = 44
     @State private var rangeReferenceDate: Date = .now
+    @State private var timelineDate: Date = .now
+    @State private var isTimelineCalendarPresented = false
     private let calendar = Calendar.current
 
     var body: some View {
@@ -48,7 +44,7 @@ struct StatsSidebarView: View {
                                 yStart: .value("基线", 0),
                                 yEnd: .value("高度", maxChartY)
                             )
-                            .foregroundStyle(Color.green.opacity(0.12))
+                            .foregroundStyle(ThemePalette.breakColor(for: colorScheme).opacity(0.15))
                         }
 
                         BarMark(
@@ -141,31 +137,65 @@ struct StatsSidebarView: View {
                 .frame(maxWidth: .infinity, maxHeight: sectionHeight)
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("专注占比", systemImage: "chart.pie")
-                        .font(.headline)
+                    HStack(spacing: 8) {
+                        Label("时间轴", systemImage: "calendar")
+                            .font(.headline)
 
-                    ZStack {
-                        Color.clear
-                        if pieSlices.isEmpty {
-                            Text("暂无占比数据")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Chart(pieSlices) { slice in
-                                SectorMark(
-                                    angle: .value("时长", slice.totalSeconds),
-                                    innerRadius: .ratio(0.5)
+                        Spacer(minLength: 8)
+
+                        Button {
+                            timelineDate = calendar.date(byAdding: .day, value: -1, to: timelineDate) ?? timelineDate
+                        } label: {
+                            Image(systemName: "chevron.left")
+                        }
+                        .buttonStyle(.bordered)
+
+                        Button {
+                            isTimelineCalendarPresented = true
+                        } label: {
+                            Text(timelineDate.formatted(.dateTime.year().month().day()))
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
+                        .popover(isPresented: $isTimelineCalendarPresented, arrowEdge: .top) {
+                            VStack(alignment: .center, spacing: 12) {
+                                Text("选择日期")
+                                    .font(.headline)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+
+                                DatePicker(
+                                    "",
+                                    selection: $timelineDate,
+                                    displayedComponents: [.date]
                                 )
-                                .foregroundStyle(by: .value("词", slice.word))
-                                .annotation(position: .overlay) {
-                                    if slice.ratio > 0.10 {
-                                        Text("\(Int(slice.ratio * 100))%")
-                                            .font(.caption2.bold())
-                                            .foregroundStyle(.white)
+                                .labelsHidden()
+                                .datePickerStyle(.graphical)
+
+                                HStack {
+                                    Spacer()
+                                    Button("完成") {
+                                        isTimelineCalendarPresented = false
                                     }
+                                    .buttonStyle(.borderedProminent)
+                                    Spacer()
                                 }
                             }
+                            .padding(12)
+                            .frame(width: 300)
                         }
+
+                        Button {
+                            timelineDate = calendar.date(byAdding: .day, value: 1, to: timelineDate) ?? timelineDate
+                        } label: {
+                            Image(systemName: "chevron.right")
+                        }
+                        .buttonStyle(.bordered)
                     }
+
+                    TodayTimelineChartView(
+                        sessions: sessions,
+                        selectedDate: timelineDate
+                    )
                     .frame(width: max(120, proxy.size.width - (outerPadding * 2)), height: max(120, sectionHeight - 32))
                 }
                 .frame(maxWidth: .infinity, maxHeight: sectionHeight)
@@ -183,21 +213,6 @@ struct StatsSidebarView: View {
 
     private var wordStats: [WordStat] {
         StatsCalculator.wordStats(from: sessions, in: statsWindow)
-    }
-
-    private var pieSlices: [PieSlice] {
-        let top = Array(wordStats.prefix(8))
-        let total = top.reduce(0.0) { $0 + $1.totalSeconds }
-        guard total > 0 else { return [] }
-
-        return top.map { stat in
-            PieSlice(
-                id: stat.id,
-                word: stat.word,
-                totalSeconds: stat.totalSeconds,
-                ratio: stat.totalSeconds / total
-            )
-        }
     }
 
     private func durationUnitText(_ seconds: Int) -> String {
@@ -221,10 +236,10 @@ struct StatsSidebarView: View {
 
     private func changeColor(for bucket: TimeBucket) -> Color {
         if bucket.changeRatio > 0 {
-            return .green
+            return ThemePalette.growthUpColor(for: colorScheme)
         }
         if bucket.changeRatio < 0 {
-            return .red
+            return ThemePalette.growthDownColor(for: colorScheme)
         }
         return .secondary
     }

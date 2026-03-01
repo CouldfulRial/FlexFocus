@@ -27,8 +27,20 @@ struct WordCloudCanvasView: View {
     let stats: [WordStat]
     let width: CGFloat
     let height: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
 
-    private let colors: [Color] = [.red, .orange, .blue, .purple, .pink, .teal, .indigo, .mint]
+    private var colors: [Color] {
+        [
+            ThemePalette.color(lightHex: "#8B9BA8", scheme: colorScheme),
+            ThemePalette.color(lightHex: "#9C8FA3", scheme: colorScheme),
+            ThemePalette.color(lightHex: "#7E9A91", scheme: colorScheme),
+            ThemePalette.color(lightHex: "#A19384", scheme: colorScheme),
+            ThemePalette.color(lightHex: "#8793B0", scheme: colorScheme),
+            ThemePalette.color(lightHex: "#8DA18B", scheme: colorScheme),
+            ThemePalette.color(lightHex: "#9E9A86", scheme: colorScheme),
+            ThemePalette.color(lightHex: "#8F8F9E", scheme: colorScheme)
+        ]
+    }
 
     var body: some View {
         ZStack {
