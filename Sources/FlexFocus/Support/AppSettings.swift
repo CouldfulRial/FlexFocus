@@ -17,6 +17,25 @@ enum VocabularyFilterMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum AppThemeMode: String, CaseIterable, Identifiable {
+    case system
+    case light
+    case dark
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .system:
+            return "跟随系统"
+        case .light:
+            return "Light"
+        case .dark:
+            return "Dark"
+        }
+    }
+}
+
 @Observable
 final class AppSettings: @unchecked Sendable {
     static let shared = AppSettings()
@@ -56,6 +75,18 @@ final class AppSettings: @unchecked Sendable {
         }
     }
 
+    var themeModeRawValue: String {
+        didSet {
+            defaults.set(themeModeRawValue, forKey: Keys.themeMode)
+        }
+    }
+
+    var invertThemeColorsInDarkMode: Bool {
+        didSet {
+            defaults.set(invertThemeColorsInDarkMode, forKey: Keys.invertThemeColorsInDarkMode)
+        }
+    }
+
     var vocabularyMode: VocabularyFilterMode {
         get { VocabularyFilterMode(rawValue: vocabularyModeRawValue) ?? .blacklist }
         set { vocabularyModeRawValue = newValue.rawValue }
@@ -70,6 +101,11 @@ final class AppSettings: @unchecked Sendable {
         }
     }
 
+    var themeMode: AppThemeMode {
+        get { AppThemeMode(rawValue: themeModeRawValue) ?? .system }
+        set { themeModeRawValue = newValue.rawValue }
+    }
+
     private let defaults: UserDefaults
 
     private enum Keys {
@@ -79,6 +115,8 @@ final class AppSettings: @unchecked Sendable {
         static let blockedWords = "settings.blockedWords"
         static let whitelistWords = "settings.whitelistWords"
         static let vocabularyMode = "settings.vocabularyMode"
+        static let themeMode = "settings.themeMode"
+        static let invertThemeColorsInDarkMode = "settings.invertThemeColorsInDarkMode"
     }
 
     private init(defaults: UserDefaults = .standard) {
@@ -88,6 +126,8 @@ final class AppSettings: @unchecked Sendable {
         self.disableDNDOnFocusEnd = defaults.object(forKey: Keys.disableDNDOnFocusEnd) as? Bool ?? true
         self.enableBreakNotification = defaults.object(forKey: Keys.enableBreakNotification) as? Bool ?? true
         self.vocabularyModeRawValue = defaults.string(forKey: Keys.vocabularyMode) ?? VocabularyFilterMode.blacklist.rawValue
+        self.themeModeRawValue = defaults.string(forKey: Keys.themeMode) ?? AppThemeMode.system.rawValue
+        self.invertThemeColorsInDarkMode = defaults.object(forKey: Keys.invertThemeColorsInDarkMode) as? Bool ?? true
 
         let blockedStored = Self.parseWordList(defaults.string(forKey: Keys.blockedWords) ?? "")
         self.blockedWordsList = blockedStored.isEmpty ? TaskKeywordAgent.defaultBlockedWords : blockedStored

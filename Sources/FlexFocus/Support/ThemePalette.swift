@@ -23,7 +23,8 @@ struct ThemePalette {
 
     static func color(lightHex: String, scheme: ColorScheme) -> Color {
         guard let rgb = RGB(hex: lightHex) else { return .primary }
-        let used = scheme == .dark ? rgb.inverted : rgb
+        let shouldInvert = scheme == .dark && AppSettings.shared.invertThemeColorsInDarkMode
+        let used = shouldInvert ? rgb.inverted : rgb
         return Color(red: used.red, green: used.green, blue: used.blue)
     }
 }

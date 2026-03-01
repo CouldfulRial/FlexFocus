@@ -15,6 +15,16 @@ struct SettingsView: View {
                 Toggle("专注结束时关闭 DND", isOn: $settings.disableDNDOnFocusEnd)
                 Toggle("休息结束发送通知", isOn: $settings.enableBreakNotification)
 
+                Section("主题") {
+                    Picker("主题模式", selection: $settings.themeModeRawValue) {
+                        ForEach(AppThemeMode.allCases) { mode in
+                            Text(mode.title).tag(mode.rawValue)
+                        }
+                    }
+
+                    Toggle("Dark 模式主题色反色", isOn: $settings.invertThemeColorsInDarkMode)
+                }
+
                 Section {
                     Button("清除所有历史数据", role: .destructive) {
                         showClearConfirm = true

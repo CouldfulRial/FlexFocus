@@ -4,6 +4,7 @@ import AppKit
 @main
 struct FlexFocusApp: App {
     @State private var menuBarTimer = MenuBarTimerState.shared
+    @State private var settings = AppSettings.shared
 
     init() {
         NSApplication.shared.setActivationPolicy(.regular)
@@ -20,6 +21,7 @@ struct FlexFocusApp: App {
         WindowGroup {
             MainContentView()
                 .frame(minWidth: MainContentView.minimumWindowWidth, minHeight: MainContentView.minimumWindowHeight)
+                .preferredColorScheme(appColorScheme)
         }
         .defaultSize(width: 1520, height: 920)
         .windowResizability(.contentMinSize)
@@ -39,6 +41,17 @@ struct FlexFocusApp: App {
         } label: {
             Text(menuBarTimer.title)
                 .monospacedDigit()
+        }
+    }
+
+    private var appColorScheme: ColorScheme? {
+        switch settings.themeMode {
+        case .system:
+            return nil
+        case .light:
+            return .light
+        case .dark:
+            return .dark
         }
     }
 }
