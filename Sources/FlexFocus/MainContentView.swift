@@ -8,7 +8,7 @@ struct MainContentView: View {
     static let rightSidebarMinWidth: CGFloat = 360
     static let centerMinWidth: CGFloat = 380
     static let splitterWidth: CGFloat = 8
-    private static let statsHeaderHeight: CGFloat = 72
+    private static let statsHeaderHeight: CGFloat = 124
     private static let statsSectionSpacing: CGFloat = 12
     private static let statsOuterPadding: CGFloat = 12
     private static let statsSectionMinHeight: CGFloat = 180

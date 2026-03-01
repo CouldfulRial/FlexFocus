@@ -11,32 +11,46 @@ private struct PieSlice: Identifiable {
 struct StatsSidebarView: View {
     let sessions: [FocusSession]
     @Binding var selectedRange: StatisticsRange
-    private let wordCloudSize = CGSize(width: 280, height: 210)
-    private let pieSize = CGSize(width: 280, height: 210)
     private let sectionSpacing: CGFloat = 12
     private let outerPadding: CGFloat = 12
+    private let topControlHeight: CGFloat = 44
+    @State private var rangeReferenceDate: Date = .now
+    private let calendar = Calendar.current
 
     var body: some View {
         GeometryReader { proxy in
-            let availableHeight = max(120, proxy.size.height - 72 - (sectionSpacing * 2) - (outerPadding * 2))
+            let availableHeight = max(120, proxy.size.height - topControlHeight - (sectionSpacing * 3) - (outerPadding * 2))
             let sectionHeight = max(120, availableHeight / 3)
 
             VStack(alignment: .leading, spacing: sectionSpacing) {
-                Picker("统计范围", selection: $selectedRange) {
-                    ForEach(StatisticsRange.allCases) { range in
-                        Text(range.rawValue).tag(range)
+                HStack(spacing: 10) {
+                    Text("横坐标区间")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Picker("", selection: $selectedRange) {
+                        ForEach(StatisticsRange.allCases) { range in
+                            Text(range.rawValue).tag(range)
+                        }
                     }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
                 }
-                .pickerStyle(.segmented)
+                .frame(height: topControlHeight)
 
                 VStack(alignment: .leading, spacing: 8) {
                     Label("专注时长", systemImage: "chart.bar")
                         .font(.headline)
                     Chart(timeBuckets) { bucket in
                         BarMark(
-                            x: .value("时间", bucket.label),
+                            x: .value("区间", bucket.label),
                             y: .value("时长", bucket.totalSeconds)
                         )
+                    }
+                    .chartXAxis {
+                        AxisMarks(values: .automatic(desiredCount: max(2, timeBuckets.count))) { _ in
+                            AxisGridLine()
+                        }
                     }
                     .chartYAxis {
                         AxisMarks(position: .leading) { value in
@@ -49,8 +63,59 @@ struct StatsSidebarView: View {
                             }
                         }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    HStack(spacing: 8) {
+                        ZStack {
+                            Text("-")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .center)
+
+                            HStack(spacing: 8) {
+                                Button {
+                                    rangeReferenceDate = StatsCalculator.shiftedReference(
+                                        from: rangeReferenceDate,
+                                        range: selectedRange,
+                                        step: -1,
+                                        calendar: calendar
+                                    )
+                                } label: {
+                                    Image(systemName: "chevron.left")
+                                }
+                                .buttonStyle(.bordered)
+
+                                Text(windowStartText)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                                Text(windowEndText)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.head)
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+
+                                Button {
+                                    rangeReferenceDate = StatsCalculator.shiftedReference(
+                                        from: rangeReferenceDate,
+                                        range: selectedRange,
+                                        step: 1,
+                                        calendar: calendar
+                                    )
+                                } label: {
+                                    Image(systemName: "chevron.right")
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
+                    }
                 }
-                .frame(maxWidth: .infinity, maxHeight: sectionHeight)
+                .frame(maxWidth: .infinity)
+                .frame(height: sectionHeight)
 
                 VStack(alignment: .leading, spacing: 8) {
                     Label("任务词云", systemImage: "cloud")
@@ -94,15 +159,18 @@ struct StatsSidebarView: View {
                 .frame(maxWidth: .infinity, maxHeight: sectionHeight)
             }
             .padding(outerPadding)
+            .onChange(of: selectedRange) { _, _ in
+                rangeReferenceDate = .now
+            }
         }
     }
 
     private var timeBuckets: [TimeBucket] {
-        StatsCalculator.buckets(for: sessions, range: selectedRange)
+        StatsCalculator.buckets(for: sessions, range: selectedRange, window: statsWindow, calendar: calendar)
     }
 
     private var wordStats: [WordStat] {
-        StatsCalculator.wordStats(from: sessions)
+        StatsCalculator.wordStats(from: sessions, in: statsWindow)
     }
 
     private var pieSlices: [PieSlice] {
@@ -128,5 +196,32 @@ struct StatsSidebarView: View {
             return "\(seconds / 60)m"
         }
         return "\(seconds)s"
+    }
+
+    private var statsWindow: StatsWindow {
+        StatsCalculator.window(for: selectedRange, reference: rangeReferenceDate, calendar: calendar)
+    }
+
+    private func displayWindowEnd(_ endExclusive: Date) -> Date {
+        endExclusive.addingTimeInterval(-1)
+    }
+
+    private var windowStartText: String {
+        switch selectedRange {
+        case .hour:
+            return statsWindow.start.formatted(.dateTime.year().month().day().hour().minute())
+        case .day, .week, .month:
+            return statsWindow.start.formatted(.dateTime.year().month().day())
+        }
+    }
+
+    private var windowEndText: String {
+        let end = displayWindowEnd(statsWindow.end)
+        switch selectedRange {
+        case .hour:
+            return end.formatted(.dateTime.year().month().day().hour().minute())
+        case .day, .week, .month:
+            return end.formatted(.dateTime.year().month().day())
+        }
     }
 }

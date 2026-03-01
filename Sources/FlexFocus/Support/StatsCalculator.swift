@@ -2,9 +2,18 @@ import Foundation
 
 struct TimeBucket: Identifiable {
     let label: String
+    let start: Date
+    let end: Date
     let totalSeconds: Int
 
     var id: String { label }
+}
+
+struct StatsWindow {
+    let start: Date
+    let end: Date
+
+    var duration: TimeInterval { end.timeIntervalSince(start) }
 }
 
 struct WordStat: Identifiable {
@@ -16,28 +25,80 @@ struct WordStat: Identifiable {
 }
 
 enum StatsCalculator {
-    static func buckets(for sessions: [FocusSession], range: StatisticsRange, now: Date = .now, calendar: Calendar = .current) -> [TimeBucket] {
+    static func window(for range: StatisticsRange, reference: Date, calendar: Calendar = .current) -> StatsWindow {
         switch range {
+        case .hour:
+            let start = calendar.dateInterval(of: .hour, for: reference)?.start ?? reference
+            let end = calendar.date(byAdding: .hour, value: 12, to: start) ?? start
+            return StatsWindow(start: start, end: end)
         case .day:
-            return dayBuckets(sessions: sessions, now: now, calendar: calendar)
+            let start = calendar.startOfDay(for: reference)
+            let end = calendar.date(byAdding: .day, value: 7, to: start) ?? start
+            return StatsWindow(start: start, end: end)
         case .week:
-            return weekBuckets(sessions: sessions, now: now, calendar: calendar)
+            let start = calendar.dateInterval(of: .weekOfYear, for: reference)?.start ?? calendar.startOfDay(for: reference)
+            let end = calendar.date(byAdding: .day, value: 49, to: start) ?? start
+            return StatsWindow(start: start, end: end)
         case .month:
-            return monthBuckets(sessions: sessions, now: now, calendar: calendar)
-        case .year:
-            return yearBuckets(sessions: sessions, now: now, calendar: calendar)
+            let start = calendar.dateInterval(of: .month, for: reference)?.start ?? calendar.startOfDay(for: reference)
+            let end = calendar.date(byAdding: .month, value: 12, to: start) ?? start
+            return StatsWindow(start: start, end: end)
         }
     }
 
-    static func wordStats(from sessions: [FocusSession]) -> [WordStat] {
+    static func shiftedReference(from reference: Date, range: StatisticsRange, step: Int, calendar: Calendar = .current) -> Date {
+        switch range {
+        case .hour:
+            return calendar.date(byAdding: .hour, value: step, to: reference) ?? reference
+        case .day:
+            return calendar.date(byAdding: .day, value: step, to: reference) ?? reference
+        case .week:
+            return calendar.date(byAdding: .weekOfYear, value: step, to: reference) ?? reference
+        case .month:
+            return calendar.date(byAdding: .month, value: step, to: reference) ?? reference
+        }
+    }
+
+    static func buckets(for sessions: [FocusSession], range: StatisticsRange, window: StatsWindow, calendar: Calendar = .current) -> [TimeBucket] {
+        let skeleton = bucketSkeleton(range: range, window: window, calendar: calendar)
+
+        return skeleton.map { raw in
+            let total = sessions.reduce(0) { partial, session in
+                partial + overlapSeconds(
+                    sessionStart: session.startTime,
+                    sessionEnd: session.endTime,
+                    bucketStart: raw.start,
+                    bucketEnd: raw.end
+                )
+            }
+            return TimeBucket(label: raw.label, start: raw.start, end: raw.end, totalSeconds: total)
+        }
+    }
+
+    static func sessions(in window: StatsWindow, from sessions: [FocusSession]) -> [FocusSession] {
+        sessions.filter { session in
+            session.endTime > window.start && session.startTime < window.end
+        }
+    }
+
+    static func wordStats(from sessions: [FocusSession], in window: StatsWindow) -> [WordStat] {
+        let scopedSessions = self.sessions(in: window, from: sessions)
         var frequencyMap: [String: Int] = [:]
         var durationMap: [String: Double] = [:]
 
-        for session in sessions {
+        for session in scopedSessions {
             let words = TaskKeywordAgent.shared.extractKeywords(from: session.task)
             guard !words.isEmpty else { continue }
 
-            let share = Double(session.durationSeconds) / Double(words.count)
+            let effectiveSeconds = Double(overlapSeconds(
+                sessionStart: session.startTime,
+                sessionEnd: session.endTime,
+                bucketStart: window.start,
+                bucketEnd: window.end
+            ))
+            guard effectiveSeconds > 0 else { continue }
+
+            let share = effectiveSeconds / Double(words.count)
             for word in words {
                 frequencyMap[word, default: 0] += 1
                 durationMap[word, default: 0] += share
@@ -56,79 +117,40 @@ enum StatsCalculator {
             }
     }
 
-    private static func dayBuckets(sessions: [FocusSession], now: Date, calendar: Calendar) -> [TimeBucket] {
-        let start = calendar.startOfDay(for: now)
-        let labels = stride(from: 0, to: 24, by: 2).map { hour -> String in
-            let value = calendar.date(byAdding: .hour, value: hour, to: start) ?? start
-            let hourValue = calendar.component(.hour, from: value)
-            let next = (hourValue + 2) % 24
-            return String(format: "%02d-%02d", hourValue, next)
-        }
-
-        var totals = Dictionary(uniqueKeysWithValues: labels.map { ($0, 0) })
-        for session in sessions {
-            guard calendar.isDate(session.startTime, inSameDayAs: now) else { continue }
-            let hour = calendar.component(.hour, from: session.startTime)
-            let bucketStart = (hour / 2) * 2
-            let key = String(format: "%02d-%02d", bucketStart, (bucketStart + 2) % 24)
-            totals[key, default: 0] += session.durationSeconds
-        }
-
-        return labels.map { TimeBucket(label: $0, totalSeconds: totals[$0, default: 0]) }
-    }
-
-    private static func weekBuckets(sessions: [FocusSession], now: Date, calendar: Calendar) -> [TimeBucket] {
-        let weekdaySymbols = ["一", "二", "三", "四", "五", "六", "日"]
-        var totals = Dictionary(uniqueKeysWithValues: weekdaySymbols.map { ($0, 0) })
-
-        for session in sessions {
-            guard calendar.isDate(session.startTime, equalTo: now, toGranularity: .weekOfYear) else { continue }
-            let weekday = calendar.component(.weekday, from: session.startTime)
-            let idx = (weekday + 5) % 7
-            totals[weekdaySymbols[idx], default: 0] += session.durationSeconds
-        }
-
-        return weekdaySymbols.map { TimeBucket(label: $0, totalSeconds: totals[$0, default: 0]) }
-    }
-
-    private static func monthBuckets(sessions: [FocusSession], now: Date, calendar: Calendar) -> [TimeBucket] {
-        let range = calendar.range(of: .day, in: .month, for: now) ?? 1..<32
-        let days = Array(range)
-        let groups = stride(from: 0, to: days.count, by: 3).map { index -> ClosedRange<Int> in
-            let first = days[index]
-            let last = days[min(index + 2, days.count - 1)]
-            return first...last
-        }
-        let labels = groups.map { group in
-            if group.lowerBound == group.upperBound {
-                return "\(group.lowerBound)"
+    private static func bucketSkeleton(range: StatisticsRange, window: StatsWindow, calendar: Calendar) -> [(label: String, start: Date, end: Date)] {
+        switch range {
+        case .hour:
+            return (0..<12).map { index in
+                let start = calendar.date(byAdding: .hour, value: index, to: window.start) ?? window.start
+                let end = calendar.date(byAdding: .hour, value: 1, to: start) ?? start
+                return (String(format: "%02d:00", calendar.component(.hour, from: start)), start, end)
             }
-            return "\(group.lowerBound)-\(group.upperBound)"
+        case .day:
+            let symbols = ["一", "二", "三", "四", "五", "六", "日"]
+            return (0..<7).map { index in
+                let start = calendar.date(byAdding: .day, value: index, to: window.start) ?? window.start
+                let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start
+                return (symbols[index], start, end)
+            }
+        case .week:
+            return (0..<7).map { index in
+                let start = calendar.date(byAdding: .day, value: index * 7, to: window.start) ?? window.start
+                let end = calendar.date(byAdding: .day, value: 7, to: start) ?? start
+                return ("第\(index + 1)周", start, end)
+            }
+        case .month:
+            return (0..<12).map { index in
+                let start = calendar.date(byAdding: .month, value: index, to: window.start) ?? window.start
+                let end = calendar.date(byAdding: .month, value: 1, to: start) ?? start
+                return ("\(index + 1)月", start, end)
+            }
         }
-        var totals = Dictionary(uniqueKeysWithValues: labels.map { ($0, 0) })
-
-        for session in sessions {
-            guard calendar.isDate(session.startTime, equalTo: now, toGranularity: .month) else { continue }
-            let day = calendar.component(.day, from: session.startTime)
-            let groupIndex = max(0, (day - 1) / 3)
-            let group = groups[min(groupIndex, groups.count - 1)]
-            let label = group.lowerBound == group.upperBound ? "\(group.lowerBound)" : "\(group.lowerBound)-\(group.upperBound)"
-            totals[label, default: 0] += session.durationSeconds
-        }
-
-        return labels.map { TimeBucket(label: $0, totalSeconds: totals[$0, default: 0]) }
     }
 
-    private static func yearBuckets(sessions: [FocusSession], now: Date, calendar: Calendar) -> [TimeBucket] {
-        let labels = (1...12).map { "\($0)月" }
-        var totals = Dictionary(uniqueKeysWithValues: labels.map { ($0, 0) })
-
-        for session in sessions {
-            guard calendar.isDate(session.startTime, equalTo: now, toGranularity: .year) else { continue }
-            let month = calendar.component(.month, from: session.startTime)
-            totals["\(month)月", default: 0] += session.durationSeconds
-        }
-
-        return labels.map { TimeBucket(label: $0, totalSeconds: totals[$0, default: 0]) }
+    private static func overlapSeconds(sessionStart: Date, sessionEnd: Date, bucketStart: Date, bucketEnd: Date) -> Int {
+        let start = max(sessionStart, bucketStart)
+        let end = min(sessionEnd, bucketEnd)
+        guard end > start else { return 0 }
+        return Int(end.timeIntervalSince(start))
     }
 }

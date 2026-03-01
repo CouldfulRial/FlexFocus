@@ -8,10 +8,10 @@ enum TimerPhase: Equatable {
 }
 
 enum StatisticsRange: String, CaseIterable, Identifiable {
+    case hour = "时"
     case day = "天"
     case week = "周"
     case month = "月"
-    case year = "年"
 
     var id: String { rawValue }
 }
