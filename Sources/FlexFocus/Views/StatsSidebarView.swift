@@ -5,6 +5,7 @@ struct StatsSidebarView: View {
     let sessions: [FocusSession]
     @Binding var selectedRange: StatisticsRange
     @Environment(\.colorScheme) private var colorScheme
+    @State private var settings = AppSettings.shared
     private let sectionSpacing: CGFloat = 12
     private let outerPadding: CGFloat = 12
     private let topControlHeight: CGFloat = 44
@@ -212,7 +213,10 @@ struct StatsSidebarView: View {
     }
 
     private var wordStats: [WordStat] {
-        StatsCalculator.wordStats(from: sessions, in: statsWindow)
+        _ = settings.vocabularyModeRawValue
+        _ = settings.blockedWordsList
+        _ = settings.whitelistWordsList
+        return StatsCalculator.wordStats(from: sessions, in: statsWindow)
     }
 
     private func durationUnitText(_ seconds: Int) -> String {

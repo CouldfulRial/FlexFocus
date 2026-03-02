@@ -43,6 +43,10 @@ struct TaskKeywordAgent {
             for phrase in phraseWords where source.contains(phrase) {
                 candidates.append(phrase)
             }
+
+            for word in singleWords where containsCJK(word) && source.contains(word) {
+                candidates.append(word)
+            }
         }
 
         var seen = Set<String>()
@@ -100,6 +104,12 @@ struct TaskKeywordAgent {
 
     private func isCJK(_ scalar: UnicodeScalar) -> Bool {
         (0x4E00...0x9FFF).contains(Int(scalar.value))
+    }
+
+    private func containsCJK(_ text: String) -> Bool {
+        text.unicodeScalars.contains { scalar in
+            isCJK(scalar)
+        }
     }
 
     private func isKeyword(
