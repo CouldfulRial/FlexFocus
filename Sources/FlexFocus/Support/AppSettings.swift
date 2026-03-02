@@ -96,7 +96,7 @@ final class AppSettings: @unchecked Sendable {
         set { themeModeRawValue = newValue.rawValue }
     }
 
-    private let profileURL: URL
+    private let profileFileName = "settings-profile.json"
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
@@ -123,13 +123,9 @@ final class AppSettings: @unchecked Sendable {
     }
 
     private init() {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let directory = appSupport.appendingPathComponent("FlexFocus", isDirectory: true)
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let url = directory.appendingPathComponent("settings-profile.json")
+        let url = Self.currentProfileURL(fileName: profileFileName)
         let initialProfile = Self.loadProfileFromFile(at: url) ?? Self.migrateFromUserDefaults(UserDefaults.standard)
 
-        self.profileURL = url
         self.enableDNDOnFocusStart = initialProfile.enableDNDOnFocusStart
         self.disableDNDOnFocusEnd = initialProfile.disableDNDOnFocusEnd
         self.enableBreakNotification = initialProfile.enableBreakNotification
@@ -227,5 +223,15 @@ final class AppSettings: @unchecked Sendable {
             themeModeRawValue: defaults.string(forKey: Keys.themeMode) ?? AppThemeMode.system.rawValue,
             invertThemeColorsInDarkMode: defaults.object(forKey: Keys.invertThemeColorsInDarkMode) as? Bool ?? true
         )
+    }
+
+    private var profileURL: URL {
+        Self.currentProfileURL(fileName: profileFileName)
+    }
+
+    private static func currentProfileURL(fileName: String) -> URL {
+        let directory = StoragePathManager.shared.currentDataDirectoryURL
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory.appendingPathComponent(fileName)
     }
 }

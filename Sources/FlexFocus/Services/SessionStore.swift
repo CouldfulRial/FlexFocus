@@ -1,15 +1,12 @@
 import Foundation
 
 final class SessionStore {
-    private let fileURL: URL
+    private let filename: String
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
     init(filename: String = "focus-sessions.json") {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let directory = appSupport.appendingPathComponent("FlexFocus", isDirectory: true)
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        self.fileURL = directory.appendingPathComponent(filename)
+        self.filename = filename
 
         encoder.dateEncodingStrategy = .iso8601
         decoder.dateDecodingStrategy = .iso8601
@@ -27,5 +24,11 @@ final class SessionStore {
 
     func clear() {
         try? FileManager.default.removeItem(at: fileURL)
+    }
+
+    private var fileURL: URL {
+        let directory = StoragePathManager.shared.currentDataDirectoryURL
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory.appendingPathComponent(filename)
     }
 }
