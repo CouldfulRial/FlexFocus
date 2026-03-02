@@ -118,8 +118,8 @@ struct WordCloudCanvasView: View {
         guard !limited.isEmpty else { return [] }
 
         let maxFrequency = max(1, limited.map(\.frequency).max() ?? 1)
-        let minFont: CGFloat = 13
-        let maxFont: CGFloat = 40
+        let (minFont, maxFont) = adaptiveFontBounds(for: size, stats: limited)
+        let allowVerticalWords = size.width >= 280 && size.height >= 180
 
         let seedBase = limited.reduce(UInt64(0)) { partial, item in
             partial &+ UInt64(item.word.hashValue.magnitude)
@@ -137,7 +137,7 @@ struct WordCloudCanvasView: View {
 
             for attempt in 0..<450 {
                 let preferVertical = idx > 4 && (attempt % 7 == 0)
-                let isVertical = preferVertical && Double.random(in: 0...1, using: &rng) < 0.2
+                let isVertical = allowVerticalWords && preferVertical && Double.random(in: 0...1, using: &rng) < 0.2
 
                 let measured = measureWord(stat.word, fontSize: fontSize)
                 let wordSize = isVertical
@@ -196,5 +196,32 @@ struct WordCloudCanvasView: View {
         ]
         let size = (word as NSString).size(withAttributes: attributes)
         return CGSize(width: ceil(size.width), height: ceil(size.height))
+    }
+
+    private func adaptiveFontBounds(for size: CGSize, stats: [WordStat]) -> (min: CGFloat, max: CGFloat) {
+        let baseMin: CGFloat = 13
+        let baseMax: CGFloat = 40
+
+        let baselineArea: CGFloat = 340 * 260
+        let currentArea = max(1, size.width * size.height)
+        let areaScale = sqrt(currentArea / baselineArea).clamped(to: 0.55...1.2)
+
+        let longestWord = stats.max(by: { $0.word.count < $1.word.count })?.word ?? ""
+        let longestAtBase = max(1, measureWord(longestWord, fontSize: baseMax).width)
+        let maxAllowedWidth = max(1, size.width * 0.86)
+        let widthScale = (maxAllowedWidth / longestAtBase).clamped(to: 0.45...1.0)
+
+        let heightScale = (size.height / 240).clamped(to: 0.55...1.1)
+        let scale = min(areaScale, widthScale, heightScale)
+
+        let scaledMax = max(12, baseMax * scale)
+        let scaledMin = max(9, min(baseMin * scale, scaledMax - 2))
+        return (scaledMin, scaledMax)
+    }
+}
+
+private extension CGFloat {
+    func clamped(to range: ClosedRange<CGFloat>) -> CGFloat {
+        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }
 }
