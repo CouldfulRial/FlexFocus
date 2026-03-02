@@ -8,6 +8,8 @@ struct SettingsView: View {
     @State private var showAddVocabularySheet = false
     @State private var newVocabularyWord = ""
     @State private var vocabularySearchText = ""
+    @State private var pendingCreateVocabularyWord = ""
+    @State private var showCreateVocabularyConfirm = false
     @State private var storageDirectoryURL = StoragePathManager.shared.currentDataDirectoryURL
 
     var body: some View {
@@ -102,8 +104,21 @@ struct SettingsView: View {
                         TextField(searchPlaceholder, text: $vocabularySearchText)
                             .textFieldStyle(.roundedBorder)
 
-                        List(filteredVocabulary, id: \.self, selection: $selectedVocabularyWord) { word in
-                            Text(word)
+                        List(selection: $selectedVocabularyWord) {
+                            if shouldShowCreateVocabularySuggestion {
+                                Button {
+                                    requestCreateWordFromSearchQuery()
+                                } label: {
+                                    Text("没有相关词汇，是否创建“\(normalizedSearchQuery)”？")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                ForEach(filteredVocabulary, id: \.self) { word in
+                                    Text(word)
+                                        .tag(word)
+                                }
+                            }
                         }
                         .frame(minHeight: 260)
 
@@ -213,6 +228,20 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .storageDirectoryDidChange)) { _ in
             storageDirectoryURL = StoragePathManager.shared.currentDataDirectoryURL
         }
+        .confirmationDialog(
+            "确认创建词汇",
+            isPresented: $showCreateVocabularyConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("创建“\(pendingCreateVocabularyWord)”") {
+                createWordFromSearchQuery()
+            }
+            Button("取消", role: .cancel) {
+                pendingCreateVocabularyWord = ""
+            }
+        } message: {
+            Text("该词汇当前不存在，是否添加到\(currentMode == .blacklist ? "黑名单" : "白名单")？")
+        }
     }
 
     @ViewBuilder
@@ -237,10 +266,20 @@ struct SettingsView: View {
     }
 
     private var filteredVocabulary: [String] {
-        let query = vocabularySearchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let query = normalizedSearchQuery
         let source = settings.currentModeWordsList
         guard !query.isEmpty else { return source }
         return source.filter { $0.localizedCaseInsensitiveContains(query) }
+    }
+
+    private var normalizedSearchQuery: String {
+        vocabularySearchText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
+
+    private var shouldShowCreateVocabularySuggestion: Bool {
+        !normalizedSearchQuery.isEmpty && filteredVocabulary.isEmpty
     }
 
     private var currentMode: VocabularyFilterMode {
@@ -267,6 +306,21 @@ struct SettingsView: View {
 
     private var appVersionText: String {
         "1.0.0 (2026)"
+    }
+
+    private func requestCreateWordFromSearchQuery() {
+        guard shouldShowCreateVocabularySuggestion else { return }
+        pendingCreateVocabularyWord = normalizedSearchQuery
+        showCreateVocabularyConfirm = true
+    }
+
+    private func createWordFromSearchQuery() {
+        let word = pendingCreateVocabularyWord.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !word.isEmpty else { return }
+        settings.addCurrentModeWord(word)
+        selectedVocabularyWord = word
+        vocabularySearchText = word
+        pendingCreateVocabularyWord = ""
     }
 
     private func changeStorageLocation() {
