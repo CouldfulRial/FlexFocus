@@ -305,7 +305,7 @@ struct SettingsView: View {
     }
 
     private var appVersionText: String {
-        "1.0.0 (2026)"
+        "1.1.0 (2027)"
     }
 
     private func requestCreateWordFromSearchQuery() {

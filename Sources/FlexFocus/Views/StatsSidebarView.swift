@@ -168,6 +168,7 @@ struct StatsSidebarView: View {
                                 DatePicker(
                                     "",
                                     selection: $timelineDate,
+                                    in: ...Date(),
                                     displayedComponents: [.date]
                                 )
                                 .labelsHidden()
@@ -187,11 +188,13 @@ struct StatsSidebarView: View {
                         }
 
                         Button {
+                            guard canMoveTimelineForward else { return }
                             timelineDate = calendar.date(byAdding: .day, value: 1, to: timelineDate) ?? timelineDate
                         } label: {
                             Image(systemName: "chevron.right")
                         }
                         .buttonStyle(.bordered)
+                        .disabled(!canMoveTimelineForward)
                     }
 
                     TodayTimelineChartView(
@@ -325,5 +328,11 @@ struct StatsSidebarView: View {
         case .day, .week, .month:
             return end.formatted(.dateTime.year().month().day())
         }
+    }
+
+    private var canMoveTimelineForward: Bool {
+        let selectedDay = calendar.startOfDay(for: timelineDate)
+        let today = calendar.startOfDay(for: Date())
+        return selectedDay < today
     }
 }

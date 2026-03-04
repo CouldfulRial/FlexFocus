@@ -1,15 +1,17 @@
 import SwiftUI
 
-private enum TodaySegmentType {
-    case focus
-    case rest
+private enum TimelineMode {
+    case day
+    case week
 }
 
-private struct TodaySegment: Identifiable {
-    let id = UUID()
+private struct TimelineSegment: Identifiable {
     let start: Date
     let end: Date
-    let type: TodaySegmentType
+
+    var id: String {
+        "\(start.timeIntervalSince1970)-\(end.timeIntervalSince1970)"
+    }
 }
 
 private struct TimelineTick: Identifiable {
@@ -25,50 +27,64 @@ struct TodayTimelineChartView: View {
     @Environment(\.colorScheme) private var colorScheme
     private let calendar = Calendar.current
 
+    private var isoCalendar: Calendar {
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = .current
+        return calendar
+    }
+
     var body: some View {
         GeometryReader { proxy in
             let width = max(1, proxy.size.width)
             let height = max(1, proxy.size.height)
-            let topPadding: CGFloat = 6
-            let bottomPadding: CGFloat = 6
-            let labelReservedHeight: CGFloat = 16
-            let summaryReservedHeight: CGFloat = 16
-            let verticalGap: CGFloat = 8
-            let summaryGap: CGFloat = 6
-            let barTop = topPadding
-            let barHeight = max(24, height - topPadding - bottomPadding - labelReservedHeight - summaryReservedHeight - verticalGap - summaryGap)
-            let barBottom = barTop + barHeight
-            let labelsTop = barBottom + verticalGap
-            let summaryTop = labelsTop + summaryGap + labelReservedHeight
+            let panelGap: CGFloat = 10
+            let panelHeight = max(68, (height - panelGap) / 2)
 
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.secondary.opacity(0.08))
-                    .frame(width: width, height: barHeight)
-                    .offset(x: 0, y: barTop)
+            VStack(spacing: panelGap) {
+                timelinePanel(mode: .day, width: width, height: panelHeight)
+                timelinePanel(mode: .week, width: width, height: panelHeight)
+            }
+            .frame(width: width, height: height, alignment: .top)
+        }
+        .frame(maxHeight: .infinity)
+    }
 
-                ForEach(segments.filter { $0.type == .rest }) { segment in
-                    Rectangle()
-                        .fill(ThemePalette.breakColor(for: colorScheme))
-                        .frame(width: segmentWidth(segment, totalWidth: width), height: barHeight)
-                        .offset(x: positionX(for: segment.start, totalWidth: width), y: barTop)
-                }
+    @ViewBuilder
+    private func timelinePanel(mode: TimelineMode, width: CGFloat, height: CGFloat) -> some View {
+        let topPadding: CGFloat = 6
+        let bottomPadding: CGFloat = 6
+        let labelReservedHeight: CGFloat = 16
+        let summaryReservedHeight: CGFloat = 16
+        let verticalGap: CGFloat = 8
+        let summaryGap: CGFloat = 6
+        let barTop = topPadding
+        let barHeight = max(24, height - topPadding - bottomPadding - labelReservedHeight - summaryReservedHeight - verticalGap - summaryGap)
+        let barBottom = barTop + barHeight
+        let labelsTop = barBottom + verticalGap
+        let summaryTop = labelsTop + summaryGap + labelReservedHeight
 
-                ForEach(segments.filter { $0.type == .focus }) { segment in
-                    Rectangle()
-                        .fill(ThemePalette.focusColor(for: colorScheme))
-                        .frame(width: segmentWidth(segment, totalWidth: width), height: barHeight)
-                        .offset(x: positionX(for: segment.start, totalWidth: width), y: barTop)
-                }
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.secondary.opacity(0.08))
+                .frame(width: width, height: barHeight)
+                .offset(x: 0, y: barTop)
 
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.secondary.opacity(0.35), lineWidth: 1)
-                    .frame(width: width, height: barHeight)
-                    .offset(x: 0, y: barTop)
+            ForEach(segments(for: mode)) { segment in
+                Rectangle()
+                    .fill(ThemePalette.focusColor(for: colorScheme))
+                    .frame(width: segmentWidth(segment, totalWidth: width, mode: mode), height: barHeight)
+                    .offset(x: positionX(for: segment.start, totalWidth: width, mode: mode), y: barTop)
+            }
 
-                ForEach(ticks) { tick in
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.secondary.opacity(0.35), lineWidth: 1)
+                .frame(width: width, height: barHeight)
+                .offset(x: 0, y: barTop)
+
+            if mode == .day {
+                ForEach(dayTicks) { tick in
                     Path { path in
-                        let x = positionX(for: tick.date, totalWidth: width)
+                        let x = positionX(for: tick.date, totalWidth: width, mode: .day)
                         path.move(to: CGPoint(x: x, y: barTop))
                         path.addLine(to: CGPoint(x: x, y: barBottom))
                     }
@@ -79,40 +95,93 @@ struct TodayTimelineChartView: View {
                 }
 
                 tickLabel("00:00", x: 0, y: labelsTop, totalWidth: width, alignment: .leading)
-                tickLabel("09:00", x: positionX(for: ticks[1].date, totalWidth: width), y: labelsTop, totalWidth: width, alignment: .center)
-                tickLabel("12:00", x: positionX(for: ticks[2].date, totalWidth: width), y: labelsTop, totalWidth: width, alignment: .center)
-                tickLabel("17:00", x: positionX(for: ticks[3].date, totalWidth: width), y: labelsTop, totalWidth: width, alignment: .center)
+                tickLabel("09:00", x: positionX(for: dayTicks[1].date, totalWidth: width, mode: .day), y: labelsTop, totalWidth: width, alignment: .center)
+                tickLabel("12:00", x: positionX(for: dayTicks[2].date, totalWidth: width, mode: .day), y: labelsTop, totalWidth: width, alignment: .center)
+                tickLabel("17:00", x: positionX(for: dayTicks[3].date, totalWidth: width, mode: .day), y: labelsTop, totalWidth: width, alignment: .center)
                 tickLabel("23:59", x: width, y: labelsTop, totalWidth: width, alignment: .trailing)
 
                 if isSelectedDateToday {
                     Path { path in
-                        let nowX = positionX(for: nowMarkerDate, totalWidth: width)
+                        let nowX = positionX(for: nowMarkerDate, totalWidth: width, mode: .day)
                         path.move(to: CGPoint(x: nowX, y: barTop - 3))
                         path.addLine(to: CGPoint(x: nowX, y: barBottom + 3))
                     }
                     .stroke(ThemePalette.nowLineColor(for: colorScheme), lineWidth: 2)
                 }
+            } else {
+                let cellWidth = width / 7
 
-                summaryText
-                    .font(.caption)
-                    .frame(width: width, alignment: .center)
-                    .offset(x: 0, y: summaryTop)
+                ForEach(1..<7, id: \.self) { index in
+                    Path { path in
+                        let x = CGFloat(index) * cellWidth
+                        path.move(to: CGPoint(x: x, y: barTop))
+                        path.addLine(to: CGPoint(x: x, y: barBottom))
+                    }
+                    .stroke(
+                        Color.secondary.opacity(0.55),
+                        style: StrokeStyle(lineWidth: 1, dash: [3, 3])
+                    )
+                }
+
+                Rectangle()
+                    .stroke(Color.black, lineWidth: 1.2)
+                    .frame(width: cellWidth, height: barHeight)
+                    .offset(x: CGFloat(selectedDayIndexInWeek) * cellWidth, y: barTop)
+
+                ForEach(Array(weekDayLabels.enumerated()), id: \.offset) { index, label in
+                    Text(label)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .position(x: (CGFloat(index) + 0.5) * cellWidth, y: labelsTop + 7)
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+            summaryText(for: mode)
+                .font(.caption)
+                .frame(width: width, alignment: .center)
+                .offset(x: 0, y: summaryTop)
         }
-        .frame(maxHeight: .infinity)
+        .frame(width: width, height: height, alignment: .topLeading)
     }
 
-    private var dayStart: Date {
+    private var selectedDayStart: Date {
         calendar.startOfDay(for: selectedDate)
     }
 
-    private var dayEnd: Date {
-        calendar.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
+    private var selectedDayEnd: Date {
+        calendar.date(byAdding: .day, value: 1, to: selectedDayStart) ?? selectedDayStart
     }
 
-    private var dayDuration: TimeInterval {
-        max(1, dayEnd.timeIntervalSince(dayStart))
+    private var weekStart: Date {
+        isoCalendar.dateInterval(of: .weekOfYear, for: selectedDate)?.start ?? selectedDayStart
+    }
+
+    private var weekEnd: Date {
+        isoCalendar.date(byAdding: .day, value: 7, to: weekStart) ?? selectedDayEnd
+    }
+
+    private var dayTicks: [TimelineTick] {
+        let nine = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: selectedDayStart) ?? selectedDayStart
+        let twelve = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: selectedDayStart) ?? selectedDayStart
+        let seventeen = calendar.date(bySettingHour: 17, minute: 0, second: 0, of: selectedDayStart) ?? selectedDayStart
+        let endTick = calendar.date(bySettingHour: 23, minute: 59, second: 0, of: selectedDayStart) ?? selectedDayEnd.addingTimeInterval(-60)
+
+        return [
+            TimelineTick(label: "00:00", date: selectedDayStart),
+            TimelineTick(label: "09:00", date: nine),
+            TimelineTick(label: "12:00", date: twelve),
+            TimelineTick(label: "17:00", date: seventeen),
+            TimelineTick(label: "23:59", date: endTick)
+        ]
+    }
+
+    private var weekDayLabels: [String] {
+        ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+    }
+
+    private var selectedDayIndexInWeek: Int {
+        let days = isoCalendar.dateComponents([.day], from: weekStart, to: selectedDayStart).day ?? 0
+        return min(max(days, 0), 6)
     }
 
     private var isSelectedDateToday: Bool {
@@ -122,86 +191,72 @@ struct TodayTimelineChartView: View {
     private var nowMarkerDate: Date {
         let now = Date()
         var components = calendar.dateComponents([.hour, .minute, .second], from: now)
-        components.year = calendar.component(.year, from: dayStart)
-        components.month = calendar.component(.month, from: dayStart)
-        components.day = calendar.component(.day, from: dayStart)
-        return calendar.date(from: components) ?? dayStart
+        components.year = calendar.component(.year, from: selectedDayStart)
+        components.month = calendar.component(.month, from: selectedDayStart)
+        components.day = calendar.component(.day, from: selectedDayStart)
+        return calendar.date(from: components) ?? selectedDayStart
     }
 
-    private var segments: [TodaySegment] {
-        let sourceSessions = sessions.sorted { $0.startTime < $1.startTime }
-        var result: [TodaySegment] = []
+    private func segments(for mode: TimelineMode) -> [TimelineSegment] {
+        let rangeStart = mode == .day ? selectedDayStart : weekStart
+        let rangeEnd = mode == .day ? selectedDayEnd : weekEnd
 
-        for session in sourceSessions {
-            if let focusInterval = clampedInterval(start: session.startTime, end: session.endTime) {
-                result.append(TodaySegment(start: focusInterval.start, end: focusInterval.end, type: .focus))
+        return sessions
+            .sorted { $0.startTime < $1.startTime }
+            .compactMap { session in
+                let lower = max(session.startTime, rangeStart)
+                let upper = min(session.endTime, rangeEnd)
+                guard upper > lower else { return nil }
+                return TimelineSegment(start: lower, end: upper)
             }
-
-            let breakStart = session.endTime
-            let breakDuration = max(60, session.durationSeconds / 5)
-            let breakEnd = breakStart.addingTimeInterval(TimeInterval(breakDuration))
-
-            if let breakInterval = clampedInterval(start: breakStart, end: breakEnd) {
-                result.append(TodaySegment(start: breakInterval.start, end: breakInterval.end, type: .rest))
-            }
-        }
-
-        return result.sorted { lhs, rhs in
-            if lhs.start == rhs.start {
-                return lhs.type == .rest && rhs.type == .focus
-            }
-            return lhs.start < rhs.start
-        }
     }
 
-    private var ticks: [TimelineTick] {
-        let nine = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: dayStart) ?? dayStart
-        let twelve = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: dayStart) ?? dayStart
-        let seventeen = calendar.date(bySettingHour: 17, minute: 0, second: 0, of: dayStart) ?? dayStart
-        let endTick = calendar.date(bySettingHour: 23, minute: 59, second: 0, of: dayStart) ?? dayEnd.addingTimeInterval(-60)
-
-        return [
-            TimelineTick(label: "00:00", date: dayStart),
-            TimelineTick(label: "09:00", date: nine),
-            TimelineTick(label: "12:00", date: twelve),
-            TimelineTick(label: "17:00", date: seventeen),
-            TimelineTick(label: "23:59", date: endTick)
-        ]
+    private func positionX(for date: Date, totalWidth: CGFloat, mode: TimelineMode) -> CGFloat {
+        let rangeStart = mode == .day ? selectedDayStart : weekStart
+        let rangeEnd = mode == .day ? selectedDayEnd : weekEnd
+        let duration = max(1, rangeEnd.timeIntervalSince(rangeStart))
+        let seconds = min(max(date.timeIntervalSince(rangeStart), 0), duration)
+        return CGFloat(seconds / duration) * totalWidth
     }
 
-    private func positionX(for date: Date, totalWidth: CGFloat) -> CGFloat {
-        let seconds = min(max(date.timeIntervalSince(dayStart), 0), dayDuration)
-        return CGFloat(seconds / dayDuration) * totalWidth
-    }
-
-    private func segmentWidth(_ segment: TodaySegment, totalWidth: CGFloat) -> CGFloat {
-        let width = positionX(for: segment.end, totalWidth: totalWidth) - positionX(for: segment.start, totalWidth: totalWidth)
+    private func segmentWidth(_ segment: TimelineSegment, totalWidth: CGFloat, mode: TimelineMode) -> CGFloat {
+        let width = positionX(for: segment.end, totalWidth: totalWidth, mode: mode)
+            - positionX(for: segment.start, totalWidth: totalWidth, mode: mode)
         return max(1, width)
     }
 
-    private func clampedInterval(start: Date, end: Date) -> DateInterval? {
-        let lower = max(start, dayStart)
-        let upper = min(end, dayEnd)
-        guard upper > lower else { return nil }
-        return DateInterval(start: lower, end: upper)
-    }
-
-    private var totalFocusedSeconds: Int {
+    private func totalFocusedSeconds(in range: DateInterval) -> Int {
         sessions.reduce(0) { partial, session in
-            partial + overlapSeconds(start: session.startTime, end: session.endTime)
+            let lower = max(session.startTime, range.start)
+            let upper = min(session.endTime, range.end)
+            guard upper > lower else { return partial }
+            return partial + Int(upper.timeIntervalSince(lower))
         }
     }
 
-    private var summaryText: Text {
-        let focusHours = Double(totalFocusedSeconds) / 3600.0
-        let percent = (focusHours / 8.0) * 100.0
-        let color = ThemePalette.focusColor(for: colorScheme)
+    private func summaryText(for mode: TimelineMode) -> Text {
+        let focusColor = ThemePalette.focusColor(for: colorScheme)
 
-        return Text("共专注 ")
-            + Text(String(format: "%.1f", focusHours)).foregroundColor(color)
-            + Text(" 小时，占8小时的 ")
-            + Text(String(format: "%.1f", percent)).foregroundColor(color)
-            + Text("%")
+        switch mode {
+        case .day:
+            let focusedSeconds = totalFocusedSeconds(in: DateInterval(start: selectedDayStart, end: selectedDayEnd))
+            let focusHours = Double(focusedSeconds) / 3600.0
+            let percent = (focusHours / 8.0) * 100.0
+            return Text("这天共专注")
+                + Text(String(format: "%.1f", focusHours)).foregroundColor(focusColor)
+                + Text("小时，占8小时的")
+                + Text(String(format: "%.1f", percent)).foregroundColor(focusColor)
+                + Text("%")
+        case .week:
+            let focusedSeconds = totalFocusedSeconds(in: DateInterval(start: weekStart, end: weekEnd))
+            let focusHours = Double(focusedSeconds) / 3600.0
+            let percent = (focusHours / 40.0) * 100.0
+            return Text("这周共专注")
+                + Text(String(format: "%.1f", focusHours)).foregroundColor(focusColor)
+                + Text("小时，占40小时的")
+                + Text(String(format: "%.1f", percent)).foregroundColor(focusColor)
+                + Text("%")
+        }
     }
 
     @ViewBuilder
@@ -225,12 +280,5 @@ struct TodayTimelineChartView: View {
                 .foregroundStyle(.secondary)
                 .position(x: x, y: y + 7)
         }
-    }
-
-    private func overlapSeconds(start: Date, end: Date) -> Int {
-        let lower = max(start, dayStart)
-        let upper = min(end, dayEnd)
-        guard upper > lower else { return 0 }
-        return Int(upper.timeIntervalSince(lower))
     }
 }
