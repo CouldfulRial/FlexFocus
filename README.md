@@ -36,6 +36,12 @@ FlexFocus 是一款面向 macOS 的可视化专注应用。它提供专注计时
   - 关于：版本号、作者、GitHub 仓库链接
   - 数据：清除历史、显示数据存储路径、打开位置、更改位置
 
+设置页截图：
+
+![设置 - 通用](setting%20general.png)
+
+![设置 - 词汇](setting%20vocab.png)
+
 - 数据与存储
   - 专注历史与设置统一存储在可配置目录
   - 默认目录：~/Library/Application Support/FlexFocus
