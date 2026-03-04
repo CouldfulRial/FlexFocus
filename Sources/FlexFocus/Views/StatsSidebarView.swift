@@ -131,6 +131,7 @@ struct StatsSidebarView: View {
                         .font(.headline)
                     WordCloudCanvasView(
                         stats: wordStats,
+                        totalFocusSeconds: totalFocusSecondsInWindow,
                         width: max(120, proxy.size.width - (outerPadding * 2)),
                         height: max(120, sectionHeight - 32)
                     )
@@ -217,6 +218,10 @@ struct StatsSidebarView: View {
         _ = settings.blockedWordsList
         _ = settings.whitelistWordsList
         return StatsCalculator.wordStats(from: sessions, in: statsWindow)
+    }
+
+    private var totalFocusSecondsInWindow: Int {
+        timeBuckets.reduce(0) { $0 + $1.totalSeconds }
     }
 
     private func durationUnitText(_ seconds: Int) -> String {

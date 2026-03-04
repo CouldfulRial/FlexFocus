@@ -25,6 +25,7 @@ private struct SeededGenerator: RandomNumberGenerator {
 
 struct WordCloudCanvasView: View {
     let stats: [WordStat]
+    let totalFocusSeconds: Int
     let width: CGFloat
     let height: CGFloat
     @Environment(\.colorScheme) private var colorScheme
@@ -32,6 +33,7 @@ struct WordCloudCanvasView: View {
     @State private var cachedStatsSignature = ""
     @State private var cachedSizeBucket = ""
     @State private var cachedThemeSignature = ""
+    @State private var hoveredWordID: String?
 
     private var colors: [Color] {
         [
@@ -52,11 +54,34 @@ struct WordCloudCanvasView: View {
 
             ForEach(cachedWords) { item in
                 Text(item.stat.word)
-                    .font(.system(size: item.fontSize, weight: .semibold))
+                    .font(.system(size: hoveredWordID == item.id ? item.fontSize * 1.14 : item.fontSize, weight: .semibold))
                     .foregroundStyle(item.color)
                     .fixedSize()
                     .rotationEffect(item.isVertical ? .degrees(90) : .degrees(0))
                     .position(x: item.rect.midX, y: item.rect.midY)
+            }
+
+            if let hoveredWord = hoveredPlacedWord {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(hoverSummary(for: hoveredWord.stat))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(.ultraThinMaterial)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+                )
+                .fixedSize()
+                .position(tooltipPosition(for: hoveredWord, in: CGSize(width: width, height: height)))
+                .zIndex(999)
+                .allowsHitTesting(false)
+                .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottom)))
             }
 
             if stats.isEmpty {
@@ -65,8 +90,21 @@ struct WordCloudCanvasView: View {
             }
         }
         .frame(width: width, height: height)
+        .contentShape(Rectangle())
         .clipped()
         .accessibilityElement(children: .contain)
+        .onContinuousHover { phase in
+            switch phase {
+            case .active(let location):
+                withAnimation(.easeOut(duration: 0.14)) {
+                    hoveredWordID = wordID(at: location)
+                }
+            case .ended:
+                withAnimation(.easeOut(duration: 0.14)) {
+                    hoveredWordID = nil
+                }
+            }
+        }
         .onAppear {
             updateLayoutIfNeeded(forceDataRefresh: true)
         }
@@ -79,6 +117,17 @@ struct WordCloudCanvasView: View {
         .onChange(of: themeSignature) { _, _ in
             updateLayoutIfNeeded(forceDataRefresh: true)
         }
+        .onChange(of: cachedSizeBucket) { _, _ in
+            if hoveredPlacedWord == nil {
+                hoveredWordID = nil
+            }
+        }
+        .animation(.easeOut(duration: 0.14), value: hoveredWordID)
+    }
+
+    private var hoveredPlacedWord: PlacedWord? {
+        guard let hoveredWordID else { return nil }
+        return cachedWords.first(where: { $0.id == hoveredWordID })
     }
 
     private var statsSignature: String {
@@ -196,6 +245,38 @@ struct WordCloudCanvasView: View {
         ]
         let size = (word as NSString).size(withAttributes: attributes)
         return CGSize(width: ceil(size.width), height: ceil(size.height))
+    }
+
+    private func hoverSummary(for stat: WordStat) -> String {
+        let hours = stat.totalSeconds / 3600
+        let percentage = totalFocusSeconds > 0
+            ? (stat.totalSeconds / Double(totalFocusSeconds)) * 100
+            : 0
+        return String(format: "%.1fh，占%.1f%%", hours, percentage)
+    }
+
+    private func wordID(at location: CGPoint) -> String? {
+        for item in cachedWords.reversed() {
+            if item.rect.insetBy(dx: -3, dy: -3).contains(location) {
+                return item.id
+            }
+        }
+        return nil
+    }
+
+    private func tooltipPosition(for item: PlacedWord, in canvasSize: CGSize) -> CGPoint {
+        let xPadding: CGFloat = 90
+        let yPadding: CGFloat = 24
+
+        let x = Swift.min(Swift.max(item.rect.midX, xPadding), canvasSize.width - xPadding)
+        let preferredAboveY = item.rect.minY - 16
+        let y: CGFloat
+        if preferredAboveY > yPadding {
+            y = preferredAboveY
+        } else {
+            y = Swift.min(canvasSize.height - yPadding, item.rect.maxY + 22)
+        }
+        return CGPoint(x: x, y: y)
     }
 
     private func adaptiveFontBounds(for size: CGSize, stats: [WordStat]) -> (min: CGFloat, max: CGFloat) {
