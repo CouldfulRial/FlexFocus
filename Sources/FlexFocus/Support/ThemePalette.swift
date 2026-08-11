@@ -21,6 +21,17 @@ struct ThemePalette {
         color(lightHex: "#1D4F2E", scheme: scheme)
     }
 
+    static func categoryColor(_ category: FocusCategory, for scheme: ColorScheme) -> Color {
+        switch category {
+        case .research:
+            return color(lightHex: "#4472C4", scheme: scheme)
+        case .teaching:
+            return color(lightHex: "#ED7D31", scheme: scheme)
+        case .others:
+            return color(lightHex: "#70AD47", scheme: scheme)
+        }
+    }
+
     static func color(lightHex: String, scheme: ColorScheme) -> Color {
         guard let rgb = RGB(hex: lightHex) else { return .primary }
         let shouldInvert = scheme == .dark && AppSettings.shared.invertThemeColorsInDarkMode

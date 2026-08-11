@@ -3,8 +3,8 @@ import AppKit
 
 @main
 struct FlexFocusApp: App {
-    @State private var menuBarTimer = MenuBarTimerState.shared
-    @State private var settings = AppSettings.shared
+    @StateObject private var menuBarTimer = MenuBarTimerState.shared
+    @StateObject private var settings = AppSettings.shared
 
     init() {
         NSApplication.shared.setActivationPolicy(.regular)
@@ -31,10 +31,10 @@ struct FlexFocusApp: App {
         }
 
         MenuBarExtra {
-            Text(menuBarTimer.isActive ? "计时进行中" : "当前无计时")
+            Text(menuBarTimer.isActive ? "Timer active" : "No active timer")
                 .padding(.bottom, 4)
             Divider()
-            Button("显示主窗口") {
+            Button("Show Main Window") {
                 NSApplication.shared.activate(ignoringOtherApps: true)
                 NSApplication.shared.windows.first?.makeKeyAndOrderFront(nil)
             }

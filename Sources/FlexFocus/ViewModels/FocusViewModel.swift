@@ -1,14 +1,13 @@
 import Foundation
-import Observation
+import Combine
 
-@Observable
-final class FocusViewModel {
-    private(set) var phase: TimerPhase = .idle
-    private(set) var elapsedFocusSeconds = 0
-    private(set) var remainingBreakSeconds = 0
-    private(set) var currentTask = ""
+final class FocusViewModel: ObservableObject, @unchecked Sendable {
+    @Published private(set) var phase: TimerPhase = .idle
+    @Published private(set) var elapsedFocusSeconds = 0
+    @Published private(set) var remainingBreakSeconds = 0
+    @Published private(set) var currentCategory: FocusCategory?
 
-    var isTaskSheetPresented = false
+    @Published var isCategoryPickerPresented = false
 
     private var focusStartTime: Date?
     private var timer: Timer?
@@ -21,22 +20,19 @@ final class FocusViewModel {
         return false
     }
 
-    func openTaskInput() {
+    func openCategoryPicker() {
         guard !isFocusing else { return }
-        isTaskSheetPresented = true
+        isCategoryPickerPresented = true
     }
 
-    func startFocus(task: String) {
-        let trimmed = task.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-
+    func startFocus(category: FocusCategory) {
         stopTimer()
-        currentTask = trimmed
+        currentCategory = category
         focusStartTime = Date()
         elapsedFocusSeconds = 0
         remainingBreakSeconds = 0
         phase = .focusing
-        isTaskSheetPresented = false
+        isCategoryPickerPresented = false
         focusModeService.activateFocusMode()
         menuBarTimerState.setFocus(seconds: elapsedFocusSeconds)
 
@@ -48,7 +44,11 @@ final class FocusViewModel {
     }
 
     func endFocusManually() {
-        guard case .focusing = phase, let start = focusStartTime else { return }
+        guard
+            case .focusing = phase,
+            let start = focusStartTime,
+            let category = currentCategory
+        else { return }
 
         stopTimer()
         let end = Date()
@@ -56,7 +56,7 @@ final class FocusViewModel {
         focusModeService.deactivateFocusMode()
 
         let completed = CompletedFocusSession(
-            task: currentTask,
+            category: category,
             startTime: start,
             endTime: end,
             durationSeconds: duration
@@ -100,7 +100,7 @@ final class FocusViewModel {
 
     private func resetToIdle() {
         phase = .idle
-        currentTask = ""
+        currentCategory = nil
         elapsedFocusSeconds = 0
         remainingBreakSeconds = 0
         focusStartTime = nil

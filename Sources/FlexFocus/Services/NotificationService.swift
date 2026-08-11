@@ -10,11 +10,11 @@ struct NotificationService {
     }
 
     func sendBreakFinishedNotification() {
-        sendLocalNotification(title: "休息结束", body: "可以开始下一轮专注了。")
+        sendLocalNotification(title: "Break Finished", body: "You can start the next focus session.")
     }
 
     func sendCrossDeviceBreakFinishedNotification() {
-        sendLocalNotification(title: "其他设备休息结束", body: "你在另一台设备上的休息已结束。")
+        sendLocalNotification(title: "Break Finished on Another Device", body: "Your break on another device has ended.")
     }
 
     private func sendLocalNotification(title: String, body: String) {

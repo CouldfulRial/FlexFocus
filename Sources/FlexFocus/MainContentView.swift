@@ -22,8 +22,8 @@ struct MainContentView: View {
     private let splitterWidth = Self.splitterWidth
 
     @State private var sessions: [FocusSession] = []
-    @State private var viewModel = FocusViewModel()
-    @State private var taskInput = ""
+    @StateObject private var viewModel = FocusViewModel()
+    @State private var selectedCategory: FocusCategory = .research
     @State private var selectedRange: StatisticsRange = .week
     @State private var didConfigureWindow = false
     @State private var leftSidebarWidth: CGFloat = 320
@@ -47,11 +47,11 @@ struct MainContentView: View {
                     phase: viewModel.phase,
                     elapsedFocusSeconds: viewModel.elapsedFocusSeconds,
                     remainingBreakSeconds: viewModel.remainingBreakSeconds,
-                    currentTask: viewModel.currentTask,
+                    currentCategory: viewModel.currentCategory,
                     contentMaxWidth: centerVisibleWidth,
                     onStart: {
                         NSApplication.shared.activate(ignoringOtherApps: true)
-                        viewModel.openTaskInput()
+                        viewModel.openCategoryPicker()
                     },
                     onEndFocus: { endFocusAndPersist() },
                     onSkipBreak: { viewModel.skipBreak() }
@@ -79,8 +79,7 @@ struct MainContentView: View {
 
                     FocusHistoryView(
                         sessions: sessions,
-                        onUpdateTask: updateSessionTask,
-                        onDeleteSession: deleteSession
+                        onUpdateSession: updateSession
                     )
                     .frame(width: rightWidth)
                     .frame(maxHeight: .infinity)
@@ -95,40 +94,38 @@ struct MainContentView: View {
                 normalizeSidebarWidths(totalWidth: newValue)
             }
         }
-        .sheet(isPresented: $viewModel.isTaskSheetPresented) {
-            TaskInputSheet(
-                inputTask: $taskInput,
-                quickTasks: recentTasks,
+        .sheet(isPresented: $viewModel.isCategoryPickerPresented) {
+            CategorySelectionSheet(
+                selectedCategory: $selectedCategory,
                 onCancel: {
-                    viewModel.isTaskSheetPresented = false
-                    taskInput = ""
+                    viewModel.isCategoryPickerPresented = false
                 },
                 onSubmit: {
-                    viewModel.startFocus(task: taskInput)
-                    taskInput = ""
+                    viewModel.startFocus(category: selectedCategory)
                 }
             )
-            .frame(width: 420)
+            .frame(width: 360)
             .padding()
             .onAppear {
                 NSApplication.shared.activate(ignoringOtherApps: true)
                 NSApplication.shared.windows.first?.makeKeyAndOrderFront(nil)
             }
         }
-        .alert("是否开始休息？", isPresented: breakConfirmationBinding) {
-            Button("稍后") {
+        .alert("Start a break?", isPresented: breakConfirmationBinding) {
+            Button("Not Now") {
                 viewModel.skipBreak()
             }
-            Button("开始休息") {
+            Button("Start Break") {
                 viewModel.confirmBreak()
             }
         } message: {
             if let completed = viewModel.consumeCompletedFocusIfNeeded() {
-                Text("休息时长 \(formatDuration(max(60, completed.durationSeconds / 5)))")
+                Text("Break duration: \(formatDuration(max(60, completed.durationSeconds / 5)))")
             }
         }
         .onAppear {
             sessions = sessionStore.load().sorted(by: { $0.startTime > $1.startTime })
+            sessionStore.save(sessions)
             configureWindowIfNeeded()
         }
         .onReceive(NotificationCenter.default.publisher(for: .clearAllHistoryRequested)) { _ in
@@ -137,22 +134,11 @@ struct MainContentView: View {
         }
     }
 
-    private var recentTasks: [String] {
-        var seen = Set<String>()
-        return sessions
-            .map(\.task)
-            .filter { task in
-                if seen.contains(task) { return false }
-                seen.insert(task)
-                return true
-            }
-    }
-
     private func endFocusAndPersist() {
         viewModel.endFocusManually()
         if let completed = viewModel.consumeCompletedFocusIfNeeded() {
             let item = FocusSession(
-                task: completed.task,
+                category: completed.category,
                 startTime: completed.startTime,
                 endTime: completed.endTime,
                 durationSeconds: completed.durationSeconds
@@ -163,15 +149,19 @@ struct MainContentView: View {
         }
     }
 
-    private func updateSessionTask(sessionID: UUID, newTask: String) {
+    private func updateSession(
+        sessionID: UUID,
+        category: FocusCategory,
+        startTime: Date,
+        endTime: Date
+    ) {
+        guard endTime > startTime else { return }
         guard let index = sessions.firstIndex(where: { $0.id == sessionID }) else { return }
-        sessions[index].task = newTask
+        sessions[index].category = category
+        sessions[index].startTime = startTime
+        sessions[index].endTime = endTime
+        sessions[index].durationSeconds = max(1, Int(endTime.timeIntervalSince(startTime)))
         sessions.sort(by: { $0.startTime > $1.startTime })
-        sessionStore.save(sessions)
-    }
-
-    private func deleteSession(sessionID: UUID) {
-        sessions.removeAll(where: { $0.id == sessionID })
         sessionStore.save(sessions)
     }
 

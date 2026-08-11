@@ -24,12 +24,11 @@ struct StatsWindow {
     var duration: TimeInterval { end.timeIntervalSince(start) }
 }
 
-struct WordStat: Identifiable {
-    let word: String
-    let frequency: Int
-    let totalSeconds: Double
+struct CategoryStat: Identifiable {
+    let category: FocusCategory
+    let totalSeconds: Int
 
-    var id: String { word }
+    var id: FocusCategory { category }
 }
 
 enum StatsCalculator {
@@ -110,43 +109,21 @@ enum StatsCalculator {
         }
     }
 
-    static func wordStats(from sessions: [FocusSession], in window: StatsWindow) -> [WordStat] {
-        let scopedSessions = self.sessions(in: window, from: sessions)
-        var frequencyMap: [String: Int] = [:]
-        var durationMap: [String: Double] = [:]
-
-        for session in scopedSessions {
-            let words = TaskKeywordAgent.shared.extractKeywords(from: session.task)
-            guard !words.isEmpty else { continue }
-
-            let effectiveSeconds = Double(overlapSeconds(
-                sessionStart: session.startTime,
-                sessionEnd: session.endTime,
-                bucketStart: window.start,
-                bucketEnd: window.end
-            ))
-            guard effectiveSeconds > 0 else { continue }
-
-            let share = effectiveSeconds / Double(words.count)
-            for word in words {
-                frequencyMap[word, default: 0] += 1
-                durationMap[word, default: 0] += share
-            }
-        }
-
-        return frequencyMap
-            .map { key, count in
-                WordStat(word: key, frequency: count, totalSeconds: durationMap[key, default: 0])
-            }
-            .sorted { lhs, rhs in
-                if lhs.frequency == rhs.frequency {
-                    if lhs.totalSeconds == rhs.totalSeconds {
-                        return lhs.word.localizedCompare(rhs.word) == .orderedAscending
-                    }
-                    return lhs.totalSeconds > rhs.totalSeconds
+    static func categoryStats(from sessions: [FocusSession], in window: StatsWindow) -> [CategoryStat] {
+        FocusCategory.allCases.compactMap { category in
+            let seconds = sessions
+                .filter { $0.category == category }
+                .reduce(0) { partial, session in
+                    partial + overlapSeconds(
+                        sessionStart: session.startTime,
+                        sessionEnd: session.endTime,
+                        bucketStart: window.start,
+                        bucketEnd: window.end
+                    )
                 }
-                return lhs.frequency > rhs.frequency
-            }
+            guard seconds > 0 else { return nil }
+            return CategoryStat(category: category, totalSeconds: seconds)
+        }
     }
 
     private static func bucketSkeleton(range: StatisticsRange, window: StatsWindow, calendar: Calendar) -> [(label: String, start: Date, end: Date)] {
@@ -167,13 +144,13 @@ enum StatsCalculator {
             return (0..<7).map { index in
                 let start = calendar.date(byAdding: .day, value: index * 7, to: window.start) ?? window.start
                 let end = calendar.date(byAdding: .day, value: 7, to: start) ?? start
-                return ("第\(index + 1)周", start, end)
+                return ("W\(index + 1)", start, end)
             }
         case .month:
             return (0..<12).map { index in
                 let start = calendar.date(byAdding: .month, value: index, to: window.start) ?? window.start
                 let end = calendar.date(byAdding: .month, value: 1, to: start) ?? start
-                return ("\(index + 1)月", start, end)
+                return ("M\(index + 1)", start, end)
             }
         }
     }
@@ -186,16 +163,10 @@ enum StatsCalculator {
     }
 
     private static func weekdayLabel(for date: Date, calendar: Calendar) -> String {
-        switch calendar.component(.weekday, from: date) {
-        case 1: return "日"
-        case 2: return "一"
-        case 3: return "二"
-        case 4: return "三"
-        case 5: return "四"
-        case 6: return "五"
-        case 7: return "六"
-        default: return "-"
-        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "EEE"
+        return formatter.string(from: date)
     }
 
     private static func previousComparisonInterval(for range: StatisticsRange, start: Date, end: Date, calendar: Calendar) -> (start: Date, end: Date) {

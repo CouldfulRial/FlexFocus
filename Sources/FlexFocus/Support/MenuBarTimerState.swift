@@ -1,23 +1,22 @@
 import Foundation
-import Observation
+import Combine
 
-@Observable
-final class MenuBarTimerState: @unchecked Sendable {
+final class MenuBarTimerState: ObservableObject, @unchecked Sendable {
     static let shared = MenuBarTimerState()
 
-    private(set) var isActive = false
-    private(set) var title = "FlexFocus"
+    @Published private(set) var isActive = false
+    @Published private(set) var title = "FlexFocus"
 
     private init() {}
 
     func setFocus(seconds: Int) {
         isActive = true
-        title = "专注 \(format(seconds))"
+        title = "Focus \(format(seconds))"
     }
 
     func setBreak(remainingSeconds: Int) {
         isActive = true
-        title = "休息 \(format(remainingSeconds))"
+        title = "Break \(format(remainingSeconds))"
     }
 
     func reset() {

@@ -1,57 +1,46 @@
 # FlexFocus
 
-## 1. 软件简介 + 主界面截图
+## Overview
 
-FlexFocus 是一款面向 macOS 的可视化专注应用。它提供专注计时、任务管理、历史记录和统计分析，帮助你追踪每天的专注效率与节奏。
+FlexFocus is a lightweight visual focus timer for macOS. Each focus session is assigned to one of three categories: Research, Teaching, or Others.
 
-![FlexFocus 主界面](main%20gui.png)
+## Features
 
-## 2. 已实现功能
+- Focus timer
+    - Select a category before starting a focus session.
+    - Save completed sessions automatically.
+    - Use a break duration equal to one fifth of the focus duration, with a one-minute minimum.
+- Statistics
+    - Compare focus duration by Hour, Day, Week, or Month.
+    - Show category proportions in a pie chart.
+    - Hover over the day or week timeline to scope the pie chart to that interval.
+    - Select any day directly from the weekly timeline.
+    - Navigate the timeline with separate day and week selectors.
+- Recent history
+    - Show sessions from the most recent seven calendar days.
+    - Edit a session category and its start and stop times.
+- Settings
+    - Configure DND automation, notifications, theme, and dark-mode colors.
+    - Clear history or change the local data directory.
 
-- 主计时区
-  - 开始专注前输入任务，支持从历史任务快速选择
-  - 专注正计时，结束后自动记录会话
-  - 休息倒计时规则：专注时长的 1/5，最短 1 分钟
-  - 长任务文本自动换行，避免被侧栏遮挡
+## Data storage
 
-- 左侧统计区
-  - 柱状图（横坐标区间：时 / 天 / 周 / 月）
-  - 环比显示与增减配色（增长 / 减少 / 持平）
-  - 工作时间与工作日高亮规则
-  - 任务词云（低饱和配色，dark 模式可反色）
-  - 时间轴（独立统计，不受柱状图区间切换影响）
-    - 00:00 到 23:59 单日时间轴
-    - 固定 5 个刻度与纵向虚线
-    - 日期切换（左右箭头）与日历浮窗选日期
-    - 当所选日期为今天时显示“当前时间”指示线
-    - 底部显示当日总专注小时与占比
+Focus history and settings are stored in a configurable directory. The default directory is:
 
-- 右侧历史区
-  - 按日期分组、组内按时间倒序（最新在上）
-  - 支持右键编辑任务与删除记录
+```text
+~/Library/Application Support/FlexFocus
+```
 
-- 设置
-  - 通用：DND、通知、主题模式（Light / Dark / 跟随系统）、dark 反色开关
-  - 词汇：黑名单/白名单模式、词汇增删改、搜索、重置默认
-  - 关于：版本号、作者、GitHub 仓库链接
-  - 数据：清除历史、显示数据存储路径、打开位置、更改位置
+The application can migrate its managed data files to another directory.
 
-设置页截图：
+## Build and package
 
-![设置 - 通用](setting%20general.png)
+Requirements: macOS 14 or later and Swift 6.2 or later.
 
-![设置 - 词汇](setting%20vocab.png)
+```bash
+swift build
+swift run
+./scripts/package_app.sh
+```
 
-- 数据与存储
-  - 专注历史与设置统一存储在可配置目录
-  - 默认目录：~/Library/Application Support/FlexFocus
-  - 支持迁移存储目录后全局共享（swift run 与打包 .app 使用同一数据位置）
-
-- 运行与打包
-  - 开发运行：swift build / swift run
-  - 打包脚本：./scripts/package_app.sh
-  - 输出应用：dist/FlexFocus.app
-
-## 3. 支持系统：macOS
-
-- macOS 14.0 及以上
+The packaged application is written to `dist/FlexFocus.app`.

@@ -4,6 +4,9 @@ set -euo pipefail
 APP_NAME="FlexFocus"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$ROOT_DIR/.build/release"
+MODULE_CACHE_DIR="$ROOT_DIR/.build/clang-module-cache"
+SWIFTPM_CACHE_DIR="$ROOT_DIR/.build/swiftpm-module-cache"
+COMPATIBLE_SDK="/Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk"
 DIST_DIR="$ROOT_DIR/dist"
 APP_DIR="$DIST_DIR/${APP_NAME}.app"
 CONTENTS_DIR="$APP_DIR/Contents"
@@ -19,7 +22,16 @@ ICON_PLIST_BLOCK=""
 mkdir -p "$DIST_DIR"
 
 cd "$ROOT_DIR"
-swift build -c release
+if [[ -d "$COMPATIBLE_SDK" ]]; then
+    CLANG_MODULE_CACHE_PATH="$MODULE_CACHE_DIR" \
+    SWIFTPM_MODULECACHE_OVERRIDE="$SWIFTPM_CACHE_DIR" \
+    SDKROOT="$COMPATIBLE_SDK" \
+    swift build -c release
+else
+    CLANG_MODULE_CACHE_PATH="$MODULE_CACHE_DIR" \
+    SWIFTPM_MODULECACHE_OVERRIDE="$SWIFTPM_CACHE_DIR" \
+    swift build -c release
+fi
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
@@ -60,7 +72,7 @@ cat > "$PLIST_PATH" <<PLIST
 <plist version="1.0">
 <dict>
     <key>CFBundleDevelopmentRegion</key>
-    <string>zh_CN</string>
+    <string>en</string>
     <key>CFBundleExecutable</key>
     <string>FlexFocus</string>
     <key>CFBundleIdentifier</key>
@@ -73,9 +85,9 @@ ${ICON_PLIST_BLOCK}
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.1.0</string>
+    <string>1.2.0</string>
     <key>CFBundleVersion</key>
-    <string>2027</string>
+    <string>2028</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSPrincipalClass</key>

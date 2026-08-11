@@ -22,7 +22,8 @@ private struct TimelineTick: Identifiable {
 
 struct TodayTimelineChartView: View {
     let sessions: [FocusSession]
-    let selectedDate: Date
+    @Binding var selectedDate: Date
+    let onHoverWindow: (StatsWindow?) -> Void
 
     @Environment(\.colorScheme) private var colorScheme
     private let calendar = Calendar.current
@@ -38,7 +39,7 @@ struct TodayTimelineChartView: View {
             let width = max(1, proxy.size.width)
             let height = max(1, proxy.size.height)
             let panelGap: CGFloat = 10
-            let panelHeight = max(68, (height - panelGap) / 2)
+            let panelHeight = max(50, (height - panelGap) / 2)
 
             VStack(spacing: panelGap) {
                 timelinePanel(mode: .day, width: width, height: panelHeight)
@@ -47,6 +48,9 @@ struct TodayTimelineChartView: View {
             .frame(width: width, height: height, alignment: .top)
         }
         .frame(maxHeight: .infinity)
+        .onDisappear {
+            onHoverWindow(nil)
+        }
     }
 
     @ViewBuilder
@@ -134,6 +138,23 @@ struct TodayTimelineChartView: View {
                         .foregroundStyle(.secondary)
                         .position(x: (CGFloat(index) + 0.5) * cellWidth, y: labelsTop + 7)
                 }
+
+                ForEach(0..<7, id: \.self) { index in
+                    let day = isoCalendar.date(byAdding: .day, value: index, to: weekStart) ?? weekStart
+                    Button {
+                        guard day <= calendar.startOfDay(for: Date()) else { return }
+                        selectedDate = day
+                    } label: {
+                        Rectangle()
+                            .fill(Color.clear)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: cellWidth, height: barHeight + labelReservedHeight + verticalGap)
+                    .offset(x: CGFloat(index) * cellWidth, y: barTop)
+                    .disabled(day > calendar.startOfDay(for: Date()))
+                    .help("Select \(day.formatted(.dateTime.year().month().day()))")
+                }
             }
 
             summaryText(for: mode)
@@ -142,6 +163,15 @@ struct TodayTimelineChartView: View {
                 .offset(x: 0, y: summaryTop)
         }
         .frame(width: width, height: height, alignment: .topLeading)
+        .contentShape(Rectangle())
+        .onContinuousHover { phase in
+            switch phase {
+            case .active:
+                onHoverWindow(window(for: mode))
+            case .ended:
+                onHoverWindow(nil)
+            }
+        }
     }
 
     private var selectedDayStart: Date {
@@ -234,6 +264,15 @@ struct TodayTimelineChartView: View {
         }
     }
 
+    private func window(for mode: TimelineMode) -> StatsWindow {
+        switch mode {
+        case .day:
+            return StatsWindow(start: selectedDayStart, end: selectedDayEnd)
+        case .week:
+            return StatsWindow(start: weekStart, end: weekEnd)
+        }
+    }
+
     private func summaryText(for mode: TimelineMode) -> Text {
         let focusColor = ThemePalette.focusColor(for: colorScheme)
 
@@ -242,20 +281,20 @@ struct TodayTimelineChartView: View {
             let focusedSeconds = totalFocusedSeconds(in: DateInterval(start: selectedDayStart, end: selectedDayEnd))
             let focusHours = Double(focusedSeconds) / 3600.0
             let percent = (focusHours / 8.0) * 100.0
-            return Text("这天共专注")
+            return Text("Day: ")
                 + Text(String(format: "%.1f", focusHours)).foregroundColor(focusColor)
-                + Text("小时，占8小时的")
+                + Text("h, ")
                 + Text(String(format: "%.1f", percent)).foregroundColor(focusColor)
-                + Text("%")
+                + Text("% of 8h")
         case .week:
             let focusedSeconds = totalFocusedSeconds(in: DateInterval(start: weekStart, end: weekEnd))
             let focusHours = Double(focusedSeconds) / 3600.0
             let percent = (focusHours / 40.0) * 100.0
-            return Text("这周共专注")
+            return Text("Week: ")
                 + Text(String(format: "%.1f", focusHours)).foregroundColor(focusColor)
-                + Text("小时，占40小时的")
+                + Text("h, ")
                 + Text(String(format: "%.1f", percent)).foregroundColor(focusColor)
-                + Text("%")
+                + Text("% of 40h")
         }
     }
 
